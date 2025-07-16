@@ -12,7 +12,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    if: github.repository == 'doocs/md'
+    if: github.repository == 'zjt003/md'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -40,7 +40,7 @@ jobs:
         run: npm run ${{ env.BUILD_COMMAND }}
 
       - name: Generate CNAME
-        run: echo "md.doocs.org" > dist/CNAME
+        run: echo "md.030111.xyz" > dist/CNAME
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

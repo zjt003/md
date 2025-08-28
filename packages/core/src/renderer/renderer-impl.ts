@@ -8,7 +8,7 @@ import hljs from 'highlight.js'
 import { marked } from 'marked'
 import mermaid from 'mermaid'
 import readingTime from 'reading-time'
-import { markedAlert, markedFootnotes, markedSlider, markedToc, MDKatex } from '../extensions'
+import { markedAlert, markedFootnotes, markedPlantUML, markedSlider, markedToc, MDKatex } from '../extensions'
 import { getStyleString } from '../utils'
 
 marked.setOptions({
@@ -16,7 +16,7 @@ marked.setOptions({
 })
 marked.use(markedSlider())
 
-function buildTheme({ theme: _theme, fonts, size, isUseIndent }: IOpts): ThemeStyles {
+function buildTheme({ theme: _theme, fonts, size, isUseIndent, isUseJustify }: IOpts): ThemeStyles {
   const theme = cloneDeep(_theme)
   const base = toMerged(theme.base, {
     'font-family': fonts,
@@ -26,6 +26,13 @@ function buildTheme({ theme: _theme, fonts, size, isUseIndent }: IOpts): ThemeSt
   if (isUseIndent) {
     theme.block.p = {
       'text-indent': `2em`,
+      ...theme.block.p,
+    }
+  }
+
+  if (isUseJustify) {
+    theme.block.p = {
+      'text-align': `justify`,
       ...theme.block.p,
     }
   }
@@ -382,6 +389,9 @@ export function initRenderer(opts: IOpts): RendererAPI {
     ),
   )
   marked.use(markedFootnotes())
+  marked.use(markedPlantUML({
+    inlineSvg: true, // 启用SVG内嵌，适用于微信公众号
+  }))
 
   return {
     buildAddition,

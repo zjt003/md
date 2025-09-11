@@ -187,7 +187,7 @@ export function initRenderer(opts: IOpts): RendererAPI {
     if (oldStyle !== newStyle) {
       marked.use(markedAlert({ styles: styleMapping }))
       marked.use(
-        MDKatex({ nonStandard: true }, styles(`inline_katex`, `;vertical-align: middle; line-height: 1;`), styles(`block_katex`, `;text-align: center;`),
+        MDKatex({ nonStandard: true }, styles(`inline_katex`, `;line-height: 1;`), styles(`block_katex`, `;text-align: center;`),
         ),
       )
     }
@@ -270,7 +270,7 @@ export function initRenderer(opts: IOpts): RendererAPI {
         .replace(/\r\n/g, `<br/>`)
         .replace(/\n/g, `<br/>`)
         .replace(/(>[^<]+)|(^[^<]+)/g, str => str.replace(/\s/g, `&nbsp;`))
-      const span = `<span class="mac-sign" style="padding: 10px 14px 0;" hidden>${macCodeSvg}</span>`
+      const span = `<span class="mac-sign" style="padding: 10px 14px 0;">${macCodeSvg}</span>`
       const code = `<code class="language-${lang}" ${styles(`code`)}>${highlighted}</code>`
       return `<pre class="hljs code__pre" ${styles(`code_pre`)}>${span}${code}</pre>`
     },
@@ -397,7 +397,7 @@ export function initRenderer(opts: IOpts): RendererAPI {
   marked.use(markedSlider({ styles: styleMapping }))
   marked.use(markedAlert({ styles: styleMapping }))
   marked.use(
-    MDKatex({ nonStandard: true }, styles(`inline_katex`, `;vertical-align: middle; line-height: 1;`), styles(`block_katex`, `;text-align: center;`),
+    MDKatex({ nonStandard: true }, styles(`inline_katex`, `;line-height: 1;`), styles(`block_katex`, `;text-align: center;`),
     ),
   )
   marked.use(markedFootnotes())

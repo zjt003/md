@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Editor } from 'codemirror'
 import type { ComponentPublicInstance } from 'vue'
+import imageCompression from 'browser-image-compression'
 import { fromTextArea } from 'codemirror'
 import { Eye, Pen } from 'lucide-vue-next'
 import {
@@ -76,7 +77,6 @@ function leftAndRightScroll() {
     if (text === `preview`) {
       source = previewRef.value!
       target = document.querySelector<HTMLElement>(`.CodeMirror-scroll`)!
-
       editor.value!.off(`scroll`, editorScrollCB)
       timeout.value = setTimeout(() => {
         editor.value!.on(`scroll`, editorScrollCB)
@@ -85,7 +85,6 @@ function leftAndRightScroll() {
     else {
       source = document.querySelector<HTMLElement>(`.CodeMirror-scroll`)!
       target = previewRef.value!
-
       target.removeEventListener(`scroll`, previewScrollCB, false)
       timeout.value = setTimeout(() => {
         target.addEventListener(`scroll`, previewScrollCB, false)
@@ -179,7 +178,9 @@ function uploaded(imageUrl: string) {
     toast.error(`上传图片未知异常`)
     return
   }
-  toggleShowUploadImgDialog(false)
+  setTimeout(() => {
+    toggleShowUploadImgDialog(false)
+  }, 1000)
   // 上传成功，获取光标
   const cursor = editor.value!.getCursor()
   const markdownImage = `![](${imageUrl})`
@@ -189,21 +190,37 @@ function uploaded(imageUrl: string) {
 }
 
 const isImgLoading = ref(false)
-
+async function compressImage(file: File) {
+  const options = {
+    maxSizeMB: 1,
+    maxWidthOrHeight: 1920,
+    useWebWorker: true,
+  }
+  const compressedFile = await imageCompression(file, options)
+  return compressedFile
+}
 async function uploadImage(
   file: File,
-  cb?: { (url: any): void, (arg0: unknown): void } | undefined,
+  cb?: { (url: any, data: string): void, (arg0: unknown): void } | undefined,
+  applyUrl?: boolean,
 ) {
   try {
     isImgLoading.value = true
-
+    // compress image if useCompression is true
+    const useCompression = localStorage.getItem(`useCompression`) === `true`
+    if (useCompression) {
+      file = await compressImage(file)
+    }
     const base64Content = await toBase64(file)
     const url = await fileUpload(base64Content, file)
     if (cb) {
-      cb(url)
+      cb(url, base64Content)
     }
     else {
       uploaded(url)
+    }
+    if (applyUrl) {
+      return uploaded(url)
     }
   }
   catch (err) {
@@ -329,7 +346,7 @@ function mdLocalToRemote() {
 const changeTimer = ref<NodeJS.Timeout>()
 
 const editorRef = useTemplateRef<HTMLTextAreaElement>(`editorRef`)
-
+const progressValue = ref(0)
 function createFormTextArea(dom: HTMLTextAreaElement) {
   const textArea = fromTextArea(dom, {
     mode: `text/x-markdown`,
@@ -359,17 +376,36 @@ function createFormTextArea(dom: HTMLTextAreaElement) {
   })
 
   // 粘贴上传图片并插入
-  textArea.on(`paste`, (_editor, event) => {
+  textArea.on(`paste`, async (_editor, event) => {
     if (!(event.clipboardData?.items) || isImgLoading.value) {
       return
     }
-
     const items = [...event.clipboardData.items].map(item => item.getAsFile()).filter(item => item != null && beforeUpload(item)) as File[]
-
-    for (const item of items) {
-      uploadImage(item)
-      event.preventDefault()
+    // 即使return了，粘贴的文本内容也会被插入
+    if (items.length === 0) {
+      return
     }
+    // start progress
+    const intervalId = setInterval(() => {
+      const newProgress = progressValue.value + 1
+      if (newProgress >= 100) {
+        return
+      }
+      progressValue.value = newProgress
+    }, 100)
+    for (const item of items) {
+      event.preventDefault()
+      await uploadImage(item)
+    }
+    const cleanup = () => {
+      clearInterval(intervalId)
+      progressValue.value = 100 // 设置完成状态
+      // 可选：延迟一段时间后重置进度
+      setTimeout(() => {
+        progressValue.value = 0
+      }, 1000)
+    }
+    cleanup()
   })
 
   return textArea
@@ -437,6 +473,7 @@ onUnmounted(() => {
 
 <template>
   <div class="container flex flex-col">
+    <Progress v-model="progressValue" class="absolute left-0 right-0 rounded-none" style="height: 2px;" />
     <EditorHeader
       @start-copy="startCopy"
       @end-copy="endCopy"
@@ -454,7 +491,7 @@ onUnmounted(() => {
           >
             <PostSlider />
           </ResizablePanel>
-          <ResizableHandle />
+          <ResizableHandle class="hidden md:block" />
           <ResizablePanel class="flex">
             <div
               v-show="!store.isMobile || (store.isMobile && showEditor)"
@@ -497,7 +534,7 @@ onUnmounted(() => {
                 >
                   <div
                     class="preview border-x shadow-xl"
-                    :class="[store.previewWidth]"
+                    :class="[store.isMobile ? 'w-[100%]' : store.previewWidth]"
                   >
                     <section id="output" class="w-full" v-html="output" />
                     <div v-if="isCoping" class="loading-mask">
@@ -517,8 +554,8 @@ onUnmounted(() => {
 
               <FloatingToc />
             </div>
-            <CssEditor class="order-2 flex-1" />
-            <RightSlider class="order-2" />
+            <CssEditor />
+            <RightSlider />
           </ResizablePanel>
         </ResizablePanelGroup>
       </div>

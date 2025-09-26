@@ -8,7 +8,7 @@ import hljs from 'highlight.js'
 import { marked } from 'marked'
 import mermaid from 'mermaid'
 import readingTime from 'reading-time'
-import { markedAlert, markedFootnotes, markedPlantUML, markedRuby, markedSlider, markedToc, MDKatex } from '../extensions'
+import { markedAlert, markedFootnotes, markedMarkup, markedPlantUML, markedRuby, markedSlider, markedToc, MDKatex } from '../extensions'
 import { getStyleString } from '../utils'
 
 marked.setOptions({
@@ -169,6 +169,13 @@ export function initRenderer(opts: IOpts): RendererAPI {
   }
 
   function addFootnote(title: string, link: string): number {
+    // 检查是否已经存在相同的链接
+    const existingFootnote = footnotes.find(([, , existingLink]) => existingLink === link)
+    if (existingFootnote) {
+      return existingFootnote[0] // 返回已存在的脚注索引
+    }
+
+    // 如果不存在，创建新的脚注
     footnotes.push([++footnoteIndex, title, link])
     return footnoteIndex
   }
@@ -190,6 +197,7 @@ export function initRenderer(opts: IOpts): RendererAPI {
         MDKatex({ nonStandard: true }, styles(`inline_katex`, `;line-height: 1;`), styles(`block_katex`, `;text-align: center;`),
         ),
       )
+      marked.use(markedMarkup({ styles: styleMapping }))
     }
   }
 
@@ -409,6 +417,7 @@ export function initRenderer(opts: IOpts): RendererAPI {
   }
 
   marked.use({ renderer })
+  marked.use(markedMarkup({ styles: styleMapping }))
   marked.use(markedToc())
   marked.use(markedSlider({ styles: styleMapping }))
   marked.use(markedAlert({ styles: styleMapping }))

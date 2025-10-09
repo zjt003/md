@@ -4,11 +4,12 @@ import type { ComponentPublicInstance } from 'vue'
 import imageCompression from 'browser-image-compression'
 import { fromTextArea } from 'codemirror'
 import { Eye, Pen } from 'lucide-vue-next'
+import { SidebarAIToolbar } from '@/components/ai'
 import {
   AIPolishButton,
   AIPolishPopover,
   useAIPolish,
-} from '@/components/AIPolish'
+} from '@/components/ai/tool-box'
 import {
   ResizableHandle,
   ResizablePanel,
@@ -503,7 +504,7 @@ onUnmounted(() => {
               }"
             >
               <SearchTab v-if="editor" ref="searchTabRef" :editor="editor" />
-              <AIFixedBtn
+              <SidebarAIToolbar
                 :is-mobile="store.isMobile"
                 :show-editor="showEditor"
               />
@@ -675,7 +676,8 @@ onUnmounted(() => {
 }
 
 .codeMirror-wrapper {
-  overflow-x: auto;
+  overflow-x: hidden;
   height: 100%;
+  position: relative;
 }
 </style>

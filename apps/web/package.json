@@ -29,8 +29,8 @@
     "package:extension": "pnpm --prefix ./src/extension run package"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.899.0",
-    "@aws-sdk/s3-request-presigner": "^3.899.0",
+    "@aws-sdk/client-s3": "^3.906.0",
+    "@aws-sdk/s3-request-presigner": "^3.906.0",
     "@exercism/highlightjs-gdscript": "^0.0.1",
     "@md/core": "workspace:*",
     "@md/shared": "workspace:*",
@@ -53,7 +53,7 @@
     "html-to-image": "^1.11.13",
     "isomorphic-dompurify": "^2.28.0",
     "juice": "^11.0.3",
-    "lucide-vue-next": "^0.544.0",
+    "lucide-vue-next": "^0.545.0",
     "marked": "^16.3.0",
     "node-fetch": "^3.3.2",
     "pinia": "^3.0.1",

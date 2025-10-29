@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { QuickCommandRuntime } from '@/stores/useQuickCommands'
+import type { QuickCommandRuntime } from '@/stores/quickCommands'
 import {
   Check,
   Copy,
@@ -17,20 +17,23 @@ import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
-import useAIConfigStore from '@/stores/AIConfig'
-import { useQuickCommands } from '@/stores/useQuickCommands'
+import useAIConfigStore from '@/stores/aiConfig'
+import { useDisplayStore } from '@/stores/display'
+import { useEditorStore } from '@/stores/editor'
+import { useQuickCommands } from '@/stores/quickCommands'
 import { copyPlain } from '@/utils/clipboard'
 
 /* ---------- 组件属性 ---------- */
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits([`update:open`])
 
-const store = useStore()
-const { editor } = storeToRefs(store)
+const editorStore = useEditorStore()
+const { editor } = storeToRefs(editorStore)
 const displayStore = useDisplayStore()
 const { toggleAIImageDialog } = displayStore
 
@@ -425,9 +428,9 @@ async function sendMessage() {
             <Trash2 class="h-4 w-4" />
           </Button>
         </div>
-        <p class="text-muted-foreground text-sm">
+        <DialogDescription class="text-muted-foreground text-sm">
           使用 AI 助手帮助您编写和优化内容
-        </p>
+        </DialogDescription>
       </DialogHeader>
 
       <!-- ============ 快捷指令 ============ -->

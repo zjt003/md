@@ -9,18 +9,19 @@ import {
   Settings,
   Trash2,
 } from 'lucide-vue-next'
-import { storeToRefs } from 'pinia'
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
-import { useDisplayStore, useStore } from '@/stores'
-import useAIImageConfigStore from '@/stores/AIImageConfig'
+import useAIImageConfigStore from '@/stores/aiImageConfig'
+import { useDisplayStore } from '@/stores/display'
+import { useEditorStore } from '@/stores/editor'
 import { copyPlain } from '@/utils/clipboard'
 import AIImageConfig from './AIImageConfig.vue'
 
@@ -29,8 +30,8 @@ const props = defineProps<{ open: boolean }>()
 const emit = defineEmits([`update:open`])
 
 /* ---------- 编辑器引用 ---------- */
-const store = useStore()
-const { editor } = storeToRefs(store)
+const editorStore = useEditorStore()
+const { editor } = storeToRefs(editorStore)
 const displayStore = useDisplayStore()
 const { toggleAIDialog } = displayStore
 
@@ -159,8 +160,6 @@ onMounted(() => {
       imageTimestamps.value = [...imageTimestamps.value, ...Array.from({ length: imagesLength - timestampsLength }, () => Date.now())]
     }
   }
-
-  console.log(`📊 数据加载完成，图片数量:`, generatedImages.value.length, `提示词数量:`, imagePrompts.value.length, `时间戳数量:`, imageTimestamps.value.length)
 
   // 启动定时器，每30秒检查一次过期图片并更新时间显示
   timeUpdateInterval.value = setInterval(() => {
@@ -617,7 +616,6 @@ function getTimeRemainingClass(index: number): string {
   <Dialog v-model:open="dialogVisible">
     <DialogContent
       class="bg-card text-card-foreground flex flex-col w-[95vw] max-h-[90vh] sm:max-h-[85vh] sm:max-w-4xl overflow-y-auto"
-      :style="{ height: 'auto' }"
     >
       <!-- ============ 头部 ============ -->
       <DialogHeader class="space-y-1 flex flex-col items-start">
@@ -655,9 +653,9 @@ function getTimeRemainingClass(index: number): string {
             <Trash2 class="h-4 w-4" />
           </Button>
         </div>
-        <p class="text-muted-foreground text-sm">
+        <DialogDescription class="text-muted-foreground text-sm">
           使用 AI 根据文字描述生成图像
-        </p>
+        </DialogDescription>
       </DialogHeader>
 
       <!-- ============ 参数配置面板 ============ -->

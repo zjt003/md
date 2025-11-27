@@ -1,14 +1,18 @@
 <script setup lang='ts'>
 import { List } from 'lucide-vue-next'
 import { useRenderStore } from '@/stores/render'
+import { useUIStore } from '@/stores/ui'
 
 const renderStore = useRenderStore()
+const uiStore = useUIStore()
+const { isPinFloatingToc, isShowFloatingToc } = storeToRefs(uiStore)
 
 const isOpenHeadingSlider = ref(false)
 </script>
 
 <template>
   <div
+    v-show="isShowFloatingToc"
     class="bg-background absolute left-0 top-0 border rounded-br-lg rounded-tr-lg rounded-bl-lg p-2 text-sm shadow-sm"
     @mouseenter="() => (isOpenHeadingSlider = true)"
     @mouseleave="() => (isOpenHeadingSlider = false)"
@@ -17,8 +21,8 @@ const isOpenHeadingSlider = ref(false)
     <ul
       class="overflow-auto transition-all"
       :class="{
-        'max-h-0 w-0': !isOpenHeadingSlider,
-        'max-h-100 w-60 mt-2': isOpenHeadingSlider,
+        'max-h-0 w-0': !isOpenHeadingSlider && !isPinFloatingToc,
+        'max-h-100 w-60 mt-2': isOpenHeadingSlider || isPinFloatingToc,
       }"
     >
       <li

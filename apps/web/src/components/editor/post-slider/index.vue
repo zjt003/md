@@ -4,6 +4,7 @@ import { useEditorStore } from '@/stores/editor'
 import { usePostStore } from '@/stores/post'
 import { useUIStore } from '@/stores/ui'
 import { addPrefix } from '@/utils'
+import { store } from '@/utils/storage'
 
 const uiStore = useUIStore()
 const { isMobile, isOpenPostSlider } = storeToRefs(uiStore)
@@ -138,7 +139,7 @@ function recoverHistory() {
 }
 
 /* ============ 排序 ============ */
-const sortMode = useStorage(addPrefix(`sort_mode`), `create-old-new`)
+const sortMode = store.reactive(addPrefix(`sort_mode`), `create-old-new`)
 const sortedPosts = computed(() => {
   return [...posts.value].sort((a, b) => {
     switch (sortMode.value) {
@@ -420,24 +421,22 @@ function handleDragEnd() {
 
       <div class="h-[50vh] flex">
         <!-- 左侧时间轴 -->
-        <ul class="space-y-2 w-[150px]">
+        <ul class="space-y-1.5 w-[180px]">
           <li
             v-for="(item, idx) in postStore.getPostById(currentPostId!)?.history"
             :key="item.datetime"
-            class="h-8 w-full inline-flex cursor-pointer items-center gap-2 rounded px-2 text-sm transition-colors"
+            class="min-h-[2.75rem] w-full inline-flex cursor-pointer items-center gap-2 rounded-md px-3 py-2.5 text-sm transition-colors leading-tight"
             :class="[
               // eslint-disable-next-line vue/prefer-separate-static-class
-              'hover:bg-primary/90 hover:text-primary-foreground',
+              'hover:bg-primary hover:text-primary-foreground',
               {
-                'bg-primary text-primary-foreground shadow-lg dark:border dark:border-primary':
-                  currentHistoryIndex === idx,
-                'dark:bg-gray/30 dark:text-primary-foreground-dark dark:border-primary-dark':
+                'bg-primary text-primary-foreground shadow-sm':
                   currentHistoryIndex === idx,
               },
             ]"
             @click="currentHistoryIndex = idx"
           >
-            {{ item.datetime }}
+            <span class="break-words w-full">{{ item.datetime }}</span>
           </li>
         </ul>
 

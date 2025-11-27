@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import type {
+  themeMap,
+} from '@md/shared/configs'
 import type { Format } from 'vue-pick-colors'
 import {
   codeBlockThemeOptions,
@@ -6,12 +9,10 @@ import {
   fontFamilyOptions,
   fontSizeOptions,
   legendOptions,
-  themeMap,
   themeOptions,
 } from '@md/shared/configs'
+
 import PickColors from 'vue-pick-colors'
-import { useCssEditorStore } from '@/stores/cssEditor'
-import { useDisplayStore } from '@/stores/display'
 import { useEditorStore } from '@/stores/editor'
 import { useRenderStore } from '@/stores/render'
 import { useThemeStore } from '@/stores/theme'
@@ -26,13 +27,11 @@ const props = withDefaults(defineProps<{
 const { asSub } = toRefs(props)
 
 const themeStore = useThemeStore()
-const displayStore = useDisplayStore()
 const uiStore = useUIStore()
 const editorStore = useEditorStore()
 const renderStore = useRenderStore()
-const cssEditorStore = useCssEditorStore()
 
-const { toggleShowCssEditor } = displayStore
+const { toggleShowCssEditor } = uiStore
 
 const {
   theme,
@@ -65,49 +64,29 @@ function editorRefresh() {
 // Theme change handlers
 function themeChanged(newTheme: keyof typeof themeMap) {
   themeStore.theme = newTheme
-  renderStore.updateTheme(
-    cssEditorStore.getCurrentTabContent(),
-    themeMap[newTheme],
-    themeStore.fontFamily,
-    themeStore.fontSize,
-    themeStore.primaryColor,
-  )
+  // 使用新主题系统
+  themeStore.applyCurrentTheme()
   editorRefresh()
 }
 
 function fontChanged(fonts: string) {
   themeStore.fontFamily = fonts
-  renderStore.updateTheme(
-    cssEditorStore.getCurrentTabContent(),
-    themeMap[themeStore.theme],
-    fonts,
-    themeStore.fontSize,
-    themeStore.primaryColor,
-  )
+  // 使用新主题系统
+  themeStore.applyCurrentTheme()
   editorRefresh()
 }
 
 function sizeChanged(size: string) {
   themeStore.fontSize = size
-  renderStore.updateTheme(
-    cssEditorStore.getCurrentTabContent(),
-    themeMap[themeStore.theme],
-    themeStore.fontFamily,
-    size,
-    themeStore.primaryColor,
-  )
+  // 使用新主题系统
+  themeStore.applyCurrentTheme()
   editorRefresh()
 }
 
 function colorChanged(newColor: string) {
   themeStore.primaryColor = newColor
-  renderStore.updateTheme(
-    cssEditorStore.getCurrentTabContent(),
-    themeMap[themeStore.theme],
-    themeStore.fontFamily,
-    themeStore.fontSize,
-    newColor,
-  )
+  // 使用新主题系统
+  themeStore.applyCurrentTheme()
   editorRefresh()
 }
 
@@ -226,7 +205,9 @@ const formatOptions = ref<Format[]>([`rgb`, `hex`, `hsl`, `hsv`])
 
   <!-- 作为 MenubarMenu 使用（默认） -->
   <MenubarMenu v-else>
-    <MenubarTrigger> 样式 </MenubarTrigger>
+    <MenubarTrigger>
+      样式
+    </MenubarTrigger>
     <MenubarContent class="w-56" align="start">
       <StyleOptionMenu
         title="主题"

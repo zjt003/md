@@ -4,11 +4,12 @@ import { Field, Form } from 'vee-validate'
 import * as yup from 'yup'
 import { useEditorStore } from '@/stores/editor'
 import { addPrefix } from '@/utils'
+import { store } from '@/utils/storage'
 
 /** 编辑器实例和全局弹窗状态 */
 const editorStore = useEditorStore()
-const displayStore = useDisplayStore()
-const { toggleShowInsertMpCardDialog } = displayStore
+const uiStore = useUIStore()
+const { toggleShowInsertMpCardDialog } = uiStore
 
 interface Config {
   id: string
@@ -29,7 +30,7 @@ interface Config {
 }
 
 /** 表单字段 */
-const config = useStorage<Config>(addPrefix(`mp-profile`), {
+const config = store.reactive<Config>(addPrefix(`mp-profile`), {
   id: ``,
   name: ``,
   logo: ``,
@@ -80,7 +81,7 @@ function submit(formValues: any) {
 </script>
 
 <template>
-  <Dialog v-model:open="displayStore.isShowInsertMpCardDialog">
+  <Dialog v-model:open="uiStore.isShowInsertMpCardDialog">
     <DialogContent>
       <DialogHeader>
         <DialogTitle>插入公众号名片</DialogTitle>

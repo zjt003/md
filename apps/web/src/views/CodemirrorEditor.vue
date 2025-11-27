@@ -4,7 +4,6 @@ import type { ComponentPublicInstance } from 'vue'
 import { Compartment, EditorState } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { highlightPendingBlocks, hljs } from '@md/core'
-import { themeMap } from '@md/shared/configs'
 import { markdownSetup, theme } from '@md/shared/editor'
 import imageCompression from 'browser-image-compression'
 import { Eye, Pen } from 'lucide-vue-next'
@@ -16,7 +15,6 @@ import {
 } from '@/components/ui/resizable'
 import { SearchTab } from '@/components/ui/search-tab'
 import { useCssEditorStore } from '@/stores/cssEditor'
-import { useDisplayStore } from '@/stores/display'
 import { useEditorStore } from '@/stores/editor'
 import { usePostStore } from '@/stores/post'
 import { useRenderStore } from '@/stores/render'
@@ -24,6 +22,7 @@ import { useThemeStore } from '@/stores/theme'
 import { useUIStore } from '@/stores/ui'
 import { checkImage, toBase64 } from '@/utils'
 import { fileUpload } from '@/utils/file'
+import { store } from '@/utils/storage'
 
 const editorStore = useEditorStore()
 const postStore = usePostStore()
@@ -31,7 +30,6 @@ const renderStore = useRenderStore()
 const themeStore = useThemeStore()
 const uiStore = useUIStore()
 const cssEditorStore = useCssEditorStore()
-const displayStore = useDisplayStore()
 
 const { editor } = storeToRefs(editorStore)
 const { output } = storeToRefs(renderStore)
@@ -46,7 +44,7 @@ const {
   isOpenConfirmDialog,
 } = storeToRefs(uiStore)
 
-const { toggleShowUploadImgDialog } = displayStore
+const { toggleShowUploadImgDialog } = uiStore
 
 // Editor refresh function
 function editorRefresh() {
@@ -68,7 +66,8 @@ function editorRefresh() {
 function resetStyle() {
   themeStore.resetStyle()
   cssEditorStore.resetCssConfig()
-  renderStore.updateCss(cssEditorStore.getCurrentTabContent())
+  // 使用新主题系统
+  themeStore.applyCurrentTheme()
   editorRefresh()
   toast.success(`样式已重置`)
 }
@@ -222,6 +221,20 @@ function openSearchWithSelection(view: EditorView) {
   }
 }
 
+function openReplaceWithSelection(view: EditorView) {
+  const selection = view.state.selection.main
+  const selected = view.state.doc.sliceString(selection.from, selection.to).trim()
+
+  if (searchTabRef.value) {
+    // SearchTab 已准备好，直接使用
+    searchTabRef.value.setSearchWithReplace(selected)
+  }
+  else {
+    // SearchTab 还没准备好，通过 UI Store 触发
+    uiStore.openSearchTab(selected, true)
+  }
+}
+
 // 监听 searchTabRef 的变化，处理待处理的请求
 watch(searchTabRef, (newRef) => {
   if (newRef && pendingSearchRequest.value) {
@@ -233,6 +246,30 @@ watch(searchTabRef, (newRef) => {
       newRef.showSearchTab = true
     }
     pendingSearchRequest.value = null
+  }
+})
+
+// 监听 UI Store 中的搜索请求
+const { searchTabRequest } = storeToRefs(uiStore)
+watch(searchTabRequest, (request) => {
+  if (request && searchTabRef.value) {
+    const { word, showReplace } = request
+
+    // 根据是否需要替换功能，调用不同的方法
+    if (showReplace) {
+      searchTabRef.value.setSearchWithReplace(word)
+    }
+    else {
+      if (word) {
+        searchTabRef.value.setSearchWord(word)
+      }
+      else {
+        searchTabRef.value.showSearchTab = true
+      }
+    }
+
+    // 清除请求
+    uiStore.clearSearchTabRequest()
   }
 })
 
@@ -252,8 +289,7 @@ onMounted(() => {
   document.addEventListener(`keydown`, handleGlobalKeydown, { passive: false, capture: false })
 })
 
-function beforeUpload(file: File) {
-  // validate image
+async function beforeImageUpload(file: File) {
   const checkResult = checkImage(file)
   if (!checkResult.ok) {
     toast.error(checkResult.msg)
@@ -261,10 +297,10 @@ function beforeUpload(file: File) {
   }
 
   // check image host
-  const imgHost = localStorage.getItem(`imgHost`) || `default`
-  localStorage.setItem(`imgHost`, imgHost)
+  const imgHost = (await store.get(`imgHost`)) || `default`
+  await store.set(`imgHost`, imgHost)
 
-  const config = localStorage.getItem(`${imgHost}Config`)
+  const config = await store.get(`${imgHost}Config`)
   const isValidHost = imgHost === `default` || config
   if (!isValidHost) {
     toast.error(`请先配置 ${imgHost} 图床参数`)
@@ -310,7 +346,7 @@ async function uploadImage(
   try {
     isImgLoading.value = true
     // compress image if useCompression is true
-    const useCompression = localStorage.getItem(`useCompression`) === `true`
+    const useCompression = (await store.get(`useCompression`)) === `true`
     if (useCompression) {
       file = await compressImage(file)
     }
@@ -443,7 +479,9 @@ function mdLocalToRemote() {
           else {
             const file = await handle.getFile()
             console.log(`file`, file)
-            beforeUpload(file) && uploadImage(file)
+            if (await beforeImageUpload(file)) {
+              uploadImage(file)
+            }
           }
         })
     }
@@ -462,6 +500,7 @@ function createFormTextArea(dom: HTMLDivElement) {
     extensions: [
       markdownSetup({
         onSearch: openSearchWithSelection,
+        onReplace: openReplaceWithSelection,
       }),
       themeCompartment.of(theme(isDark.value)),
       EditorView.updateListener.of((update) => {
@@ -497,9 +536,15 @@ function createFormTextArea(dom: HTMLDivElement) {
     if (!(event.clipboardData?.items) || isImgLoading.value) {
       return
     }
-    const items = [...event.clipboardData.items].map(item => item.getAsFile()).filter(item => item != null && beforeUpload(item)) as File[]
+    const items = await Promise.all(
+      [...event.clipboardData.items]
+        .map(item => item.getAsFile())
+        .filter(item => item != null)
+        .map(async item => (await beforeImageUpload(item!)) ? item : null),
+    )
+    const validItems = items.filter(item => item != null) as File[]
     // 即使return了，粘贴的文本内容也会被插入
-    if (items.length === 0) {
+    if (validItems.length === 0) {
       return
     }
     // start progress
@@ -510,7 +555,7 @@ function createFormTextArea(dom: HTMLDivElement) {
       }
       progressValue.value = newProgress
     }, 100)
-    for (const item of items) {
+    for (const item of validItems) {
       event.preventDefault()
       await uploadImage(item)
     }
@@ -537,21 +582,14 @@ onMounted(() => {
     return
   }
 
-  // 初始化渲染器
-  const cssContent = cssEditorStore.getCurrentTabContent()
-  renderStore.initRendererInstance(
-    cssContent,
-    themeMap[themeStore.theme],
-    themeStore.fontFamily,
-    themeStore.fontSize,
-    {
-      primaryColor: themeStore.primaryColor,
-      isUseIndent: themeStore.isUseIndent,
-      isUseJustify: themeStore.isUseJustify,
-      isMacCodeBlock: themeStore.isMacCodeBlock,
-      isShowLineNumber: themeStore.isShowLineNumber,
-    },
-  )
+  // 初始化渲染器（新主题系统）
+  renderStore.initRendererInstance({
+    isMacCodeBlock: themeStore.isMacCodeBlock,
+    isShowLineNumber: themeStore.isShowLineNumber,
+  })
+
+  // 应用主题样式（新主题系统）
+  themeStore.applyCurrentTheme()
 
   nextTick(() => {
     const editorView = createFormTextArea(editorDom)
@@ -648,7 +686,7 @@ onUnmounted(() => {
         <ResizablePanelGroup direction="horizontal">
           <ResizablePanel
             :default-size="15"
-            :max-size="isOpenPostSlider ? 30 : 0"
+            :max-size="isOpenPostSlider ? 20 : 0"
             :min-size="isOpenPostSlider ? 10 : 0"
           >
             <PostSlider />
@@ -686,16 +724,19 @@ onUnmounted(() => {
               <div
                 id="preview"
                 ref="previewRef"
-                class="preview-wrapper w-full p-5"
+                class="preview-wrapper w-full p-5 flex justify-center"
               >
                 <div
                   id="output-wrapper"
-                  class="w-full"
+                  class="w-full max-w-full"
                   :class="{ output_night: !backLight }"
                 >
                   <div
-                    class="preview border-x shadow-xl"
-                    :class="[isMobile ? 'w-[100%]' : previewWidth]"
+                    class="preview border-x shadow-xl mx-auto"
+                    :class="[
+                      isMobile ? 'w-full' : previewWidth,
+                      themeStore.previewWidth === 'w-[375px]' ? 'max-w-full' : '',
+                    ]"
                   >
                     <section id="output" class="w-full" v-html="output" />
                     <div v-if="isCoping" class="loading-mask">
@@ -740,6 +781,8 @@ onUnmounted(() => {
       <InsertFormDialog />
 
       <InsertMpCardDialog />
+
+      <TemplateDialog />
 
       <AlertDialog v-model:open="isOpenConfirmDialog">
         <AlertDialogContent>

@@ -155,6 +155,10 @@ function getPlatformUrl(type: string): string {
     tencentcloud: 'https://cloud.tencent.com/developer',
     medium: 'https://medium.com/m/signin',
     sspai: 'https://sspai.com/login',
+    sohu: 'https://mp.sohu.com/mpfe/v4/login',
+    bilibili: 'https://passport.bilibili.com/login',
+    weibo: 'https://passport.weibo.com/sso/signin',
+    aliyun: 'https://account.aliyun.com/login/login.htm',
   }
   return urls[type] || '#'
 }

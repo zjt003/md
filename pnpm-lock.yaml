@@ -291,8 +291,8 @@ importers:
         specifier: ^4.1.18
         version: 4.1.18
       unplugin-auto-import:
-        specifier: ^20.3.0
-        version: 20.3.0(@vueuse/core@14.1.0(vue@3.5.25(typescript@5.9.3)))
+        specifier: ^21.0.0
+        version: 21.0.0(@vueuse/core@14.1.0(vue@3.5.25(typescript@5.9.3)))
       unplugin-vue-components:
         specifier: ^30.0.0
         version: 30.0.0(@babel/parser@7.28.5)(vue@3.5.25(typescript@5.9.3))
@@ -428,13 +428,13 @@ importers:
         version: 6.5.11
       '@fsegurai/codemirror-theme-vscode-dark':
         specifier: ^6.2.3
-        version: 6.2.3(@codemirror/language@6.11.3)(@codemirror/state@6.5.2)(@codemirror/view@6.38.8(patch_hash=b8605747598f5f6c64ac060294b07185a9feb98ec18da8bcc47f4319a4d06ec2))(@lezer/highlight@1.2.3)
+        version: 6.2.3(@codemirror/language@6.11.3)(@codemirror/state@6.5.4)(@codemirror/view@6.38.8(patch_hash=b8605747598f5f6c64ac060294b07185a9feb98ec18da8bcc47f4319a4d06ec2))(@lezer/highlight@1.2.3)
       '@fsegurai/codemirror-theme-vscode-light':
         specifier: ^6.2.3
-        version: 6.2.3(@codemirror/language@6.11.3)(@codemirror/state@6.5.2)(@codemirror/view@6.38.8(patch_hash=b8605747598f5f6c64ac060294b07185a9feb98ec18da8bcc47f4319a4d06ec2))(@lezer/highlight@1.2.3)
+        version: 6.2.3(@codemirror/language@6.11.3)(@codemirror/state@6.5.4)(@codemirror/view@6.38.8(patch_hash=b8605747598f5f6c64ac060294b07185a9feb98ec18da8bcc47f4319a4d06ec2))(@lezer/highlight@1.2.3)
       '@replit/codemirror-indentation-markers':
         specifier: ^6.5.3
-        version: 6.5.3(@codemirror/language@6.11.3)(@codemirror/state@6.5.2)(@codemirror/view@6.38.8(patch_hash=b8605747598f5f6c64ac060294b07185a9feb98ec18da8bcc47f4319a4d06ec2))
+        version: 6.5.3(@codemirror/language@6.11.3)(@codemirror/state@6.5.4)(@codemirror/view@6.38.8(patch_hash=b8605747598f5f6c64ac060294b07185a9feb98ec18da8bcc47f4319a4d06ec2))
       axios:
         specifier: ^1.13.2
         version: 1.13.2
@@ -1096,6 +1096,9 @@ packages:
 
   '@codemirror/state@6.5.2':
     resolution: {integrity: sha512-FVqsPqtPWKVVL3dPSxy8wEF/ymIEuVzF1PK3VbUgrxXpJUSHQWWZz4JMToquRxnkw+36LTamCZG2iua2Ptq0fA==}
+
+  '@codemirror/state@6.5.4':
+    resolution: {integrity: sha512-8y7xqG/hpB53l25CIoit9/ngxdfoG+fx+V3SHBrinnhOtLvKHRyAJJuHzkWrR4YXXLX8eXBsejgAAxHUOdW1yw==}
 
   '@codemirror/view@6.38.8':
     resolution: {integrity: sha512-XcE9fcnkHCbWkjeKyi0lllwXmBLtyYb5dt89dJyx23I9+LSh5vZDIuk7OLG4VM1lgrXZQcY6cxyZyk5WVPRv/A==}
@@ -7349,6 +7352,10 @@ packages:
     resolution: {integrity: sha512-/JpWMG9s1nBSlXJAQ8EREFTFy3oy6USFd8T6AoBaw1q2GGcF4R9yp3ofg32UODZlYEO5VD0EWE1RpI9XDWyPYg==}
     engines: {node: '>=18.12.0'}
 
+  unimport@5.6.0:
+    resolution: {integrity: sha512-8rqAmtJV8o60x46kBAJKtHpJDJWkA2xcBqWKPI14MgUb05o1pnpnCnXSxedUXyeq7p8fR5g3pTo2BaswZ9lD9A==}
+    engines: {node: '>=18.12.0'}
+
   unist-util-is@6.0.1:
     resolution: {integrity: sha512-LsiILbtBETkDz8I9p1dQ0uyRUWuaQzd/cuEeS1hoRSyW5E5XGmTzlwY1OrNzzakGowI9Dr/I8HVaw4hTtnxy8g==}
 
@@ -7369,9 +7376,9 @@ packages:
     resolution: {integrity: sha512-pjy2bYhSsufwWlKwPc+l3cN7+wuJlK6uz0YdJEOlQDbl6jo/YlPi4mb8agUkVC8BF7V8NuzeyPNqRksA3hztKQ==}
     engines: {node: '>= 0.8'}
 
-  unplugin-auto-import@20.3.0:
-    resolution: {integrity: sha512-RcSEQiVv7g0mLMMXibYVKk8mpteKxvyffGuDKqZZiFr7Oq3PB1HwgHdK5O7H4AzbhzHoVKG0NnMnsk/1HIVYzQ==}
-    engines: {node: '>=14'}
+  unplugin-auto-import@21.0.0:
+    resolution: {integrity: sha512-vWuC8SwqJmxZFYwPojhOhOXDb5xFhNNcEVb9K/RFkyk/3VnfaOjzitWN7v+8DEKpMjSsY2AEGXNgt6I0yQrhRQ==}
+    engines: {node: '>=20.19.0'}
     peerDependencies:
       '@nuxt/kit': ^4.0.0
       '@vueuse/core': '*'
@@ -9118,6 +9125,10 @@ snapshots:
     dependencies:
       '@marijn/find-cluster-break': 1.0.2
 
+  '@codemirror/state@6.5.4':
+    dependencies:
+      '@marijn/find-cluster-break': 1.0.2
+
   '@codemirror/view@6.38.8(patch_hash=b8605747598f5f6c64ac060294b07185a9feb98ec18da8bcc47f4319a4d06ec2)':
     dependencies:
       '@codemirror/state': 6.5.2
@@ -9461,17 +9472,17 @@ snapshots:
       - '@vue/composition-api'
       - vue
 
-  '@fsegurai/codemirror-theme-vscode-dark@6.2.3(@codemirror/language@6.11.3)(@codemirror/state@6.5.2)(@codemirror/view@6.38.8(patch_hash=b8605747598f5f6c64ac060294b07185a9feb98ec18da8bcc47f4319a4d06ec2))(@lezer/highlight@1.2.3)':
+  '@fsegurai/codemirror-theme-vscode-dark@6.2.3(@codemirror/language@6.11.3)(@codemirror/state@6.5.4)(@codemirror/view@6.38.8(patch_hash=b8605747598f5f6c64ac060294b07185a9feb98ec18da8bcc47f4319a4d06ec2))(@lezer/highlight@1.2.3)':
     dependencies:
       '@codemirror/language': 6.11.3
-      '@codemirror/state': 6.5.2
+      '@codemirror/state': 6.5.4
       '@codemirror/view': 6.38.8(patch_hash=b8605747598f5f6c64ac060294b07185a9feb98ec18da8bcc47f4319a4d06ec2)
       '@lezer/highlight': 1.2.3
 
-  '@fsegurai/codemirror-theme-vscode-light@6.2.3(@codemirror/language@6.11.3)(@codemirror/state@6.5.2)(@codemirror/view@6.38.8(patch_hash=b8605747598f5f6c64ac060294b07185a9feb98ec18da8bcc47f4319a4d06ec2))(@lezer/highlight@1.2.3)':
+  '@fsegurai/codemirror-theme-vscode-light@6.2.3(@codemirror/language@6.11.3)(@codemirror/state@6.5.4)(@codemirror/view@6.38.8(patch_hash=b8605747598f5f6c64ac060294b07185a9feb98ec18da8bcc47f4319a4d06ec2))(@lezer/highlight@1.2.3)':
     dependencies:
       '@codemirror/language': 6.11.3
-      '@codemirror/state': 6.5.2
+      '@codemirror/state': 6.5.4
       '@codemirror/view': 6.38.8(patch_hash=b8605747598f5f6c64ac060294b07185a9feb98ec18da8bcc47f4319a4d06ec2)
       '@lezer/highlight': 1.2.3
 
@@ -9767,10 +9778,10 @@ snapshots:
 
   '@remix-run/node-fetch-server@0.8.1': {}
 
-  '@replit/codemirror-indentation-markers@6.5.3(@codemirror/language@6.11.3)(@codemirror/state@6.5.2)(@codemirror/view@6.38.8(patch_hash=b8605747598f5f6c64ac060294b07185a9feb98ec18da8bcc47f4319a4d06ec2))':
+  '@replit/codemirror-indentation-markers@6.5.3(@codemirror/language@6.11.3)(@codemirror/state@6.5.4)(@codemirror/view@6.38.8(patch_hash=b8605747598f5f6c64ac060294b07185a9feb98ec18da8bcc47f4319a4d06ec2))':
     dependencies:
       '@codemirror/language': 6.11.3
-      '@codemirror/state': 6.5.2
+      '@codemirror/state': 6.5.4
       '@codemirror/view': 6.38.8(patch_hash=b8605747598f5f6c64ac060294b07185a9feb98ec18da8bcc47f4319a4d06ec2)
 
   '@rolldown/pluginutils@1.0.0-beta.50': {}
@@ -16235,6 +16246,23 @@ snapshots:
       unplugin: 2.3.11
       unplugin-utils: 0.3.1
 
+  unimport@5.6.0:
+    dependencies:
+      acorn: 8.15.0
+      escape-string-regexp: 5.0.0
+      estree-walker: 3.0.3
+      local-pkg: 1.1.2
+      magic-string: 0.30.21
+      mlly: 1.8.0
+      pathe: 2.0.3
+      picomatch: 4.0.3
+      pkg-types: 2.3.0
+      scule: 1.3.0
+      strip-literal: 3.1.0
+      tinyglobby: 0.2.15
+      unplugin: 2.3.11
+      unplugin-utils: 0.3.1
+
   unist-util-is@6.0.1:
     dependencies:
       '@types/unist': 3.0.3
@@ -16258,12 +16286,12 @@ snapshots:
 
   unpipe@1.0.0: {}
 
-  unplugin-auto-import@20.3.0(@vueuse/core@14.1.0(vue@3.5.25(typescript@5.9.3))):
+  unplugin-auto-import@21.0.0(@vueuse/core@14.1.0(vue@3.5.25(typescript@5.9.3))):
     dependencies:
       local-pkg: 1.1.2
       magic-string: 0.30.21
       picomatch: 4.0.3
-      unimport: 5.5.0
+      unimport: 5.6.0
       unplugin: 2.3.11
       unplugin-utils: 0.3.1
     optionalDependencies:

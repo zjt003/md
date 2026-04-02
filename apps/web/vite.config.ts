@@ -11,7 +11,7 @@ import { defineConfig, loadEnv } from 'vite'
 import { VitePluginRadar } from 'vite-plugin-radar'
 import vueDevTools from 'vite-plugin-vue-devtools'
 
-import { utoolsLocalAssetsPlugin } from './plugins/vite-plugin-utools-local-assets'
+import { mathjaxLocalPlugin } from './plugins/vite-plugin-mathjax-local'
 
 const isNetlify = process.env.SERVER_ENV === `NETLIFY`
 const isUTools = process.env.SERVER_ENV === `UTOOLS`
@@ -47,7 +47,7 @@ export default defineConfig(({ mode }) => {
       Components({
         resolvers: [],
       }),
-      isUTools && utoolsLocalAssetsPlugin(),
+      mathjaxLocalPlugin(),
     ],
     resolve: {
       alias: { '@': path.resolve(__dirname, `./src`) },
@@ -56,12 +56,10 @@ export default defineConfig(({ mode }) => {
     css: { devSourcemap: true },
     build: {
       rollupOptions: {
-        external: [`mermaid`],
         output: {
           chunkFileNames: `static/js/md-[name]-[hash].js`,
           entryFileNames: `static/js/md-[name]-[hash].js`,
           assetFileNames: `static/[ext]/md-[name]-[hash].[ext]`,
-          globals: { mermaid: `mermaid` },
           manualChunks(id) {
             if (id.includes(`node_modules`)) {
               // @lezer/* are CodeMirror's parser primitives, keep together

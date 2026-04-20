@@ -52,8 +52,6 @@ function openAddPostDialog(id: string) {
 function addPost() {
   if (!addPostInputVal.value.trim())
     return toast.error(`内容标题不可为空`)
-  if (posts.value.some(post => post.title === addPostInputVal.value.trim()))
-    return toast.error(`内容标题已存在`)
   postStore.addPost(addPostInputVal.value.trim(), parentId.value)
   isOpenAddDialog.value = false
   toast.success(`内容新增成功`)
@@ -72,14 +70,6 @@ function startRenamePost(id: string) {
 function renamePost() {
   if (!renamePostInputVal.value.trim()) {
     return toast.error(`内容标题不可为空`)
-  }
-
-  if (
-    posts.value.some(
-      post => post.title === renamePostInputVal.value.trim() && post.id !== editId.value,
-    )
-  ) {
-    return toast.error(`内容标题已存在`)
   }
 
   if (renamePostInputVal.value === postStore.getPostById(editId.value!)?.title) {
@@ -530,9 +520,8 @@ function handleDragEnd() {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <!-- 移动端关闭 -->
+        <!-- 关闭 -->
         <button
-          v-if="isMobile"
           class="inline-flex items-center justify-center size-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors duration-150 ml-0.5"
           @click="isOpenPostSlider = false"
         >
@@ -609,19 +598,25 @@ function handleDragEnd() {
           v-if="sortedPosts.length"
           :parent-id="null"
           :sorted-posts="sortedPosts"
-          :start-rename-post="startRenamePost"
-          :open-history-dialog="openHistoryDialog"
-          :start-del-post="startDelPost"
-          :drop-target-id="dropTargetId"
-          :set-drop-target-id="(id: string | null) => (dropTargetId = id)"
-          :drag-source-id="dragSourceId"
-          :set-drag-source-id="(id: string | null) => (dragSourceId = id)"
-          :handle-drop="handleDrop"
-          :handle-drag-end="handleDragEnd"
-          :open-add-post-dialog="openAddPostDialog"
-          :is-select-mode="isSelectMode"
-          :selected-ids="selectedPostIds"
-          :on-toggle-select="toggleSelectPost"
+          :actions="{
+            startRenamePost,
+            openHistoryDialog,
+            startDelPost,
+            openAddPostDialog,
+          }"
+          :drag="{
+            dragSourceId,
+            dropTargetId,
+            setDragSourceId: (id: string | null) => (dragSourceId = id),
+            setDropTargetId: (id: string | null) => (dropTargetId = id),
+            handleDrop,
+            handleDragEnd,
+          }"
+          :select="{
+            isSelectMode,
+            selectedIds: selectedPostIds,
+            onToggleSelect: toggleSelectPost,
+          }"
         />
 
         <!-- 空状态 -->

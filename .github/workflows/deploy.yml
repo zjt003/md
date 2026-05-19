@@ -1,8 +1,8 @@
 name: Build and Deploy
 
-on:
+于:
   push:
-    branches: [main]
+    分支: [main]
   workflow_dispatch:
 
 concurrency:
@@ -12,7 +12,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    if: github.repository == 'doocs/md'
+    if: github.repository == 'zjt003/md'
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -47,7 +47,7 @@ jobs:
       - name: Generate CNAME
         run: |
           mkdir -p apps/web/dist
-          echo "md.doocs.org" > apps/web/dist/CNAME
+          echo "md.0000301.xyz" > apps/web/dist/CNAME
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v5

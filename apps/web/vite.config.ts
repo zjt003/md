@@ -29,10 +29,16 @@ export default defineConfig(({ mode }) => {
     base,
     envPrefix: [`VITE_`, `CF_`],
     plugins: [
-      vue(),
+      vue({
+        template: {
+          compilerOptions: {
+            isCustomElement: tag => tag === `math-field`,
+          },
+        },
+      }),
       isCfWorkers && cloudflare(),
       tailwindcss(),
-      vueDevTools({
+      mode === `development` && vueDevTools({
         launchEditor: env.VITE_LAUNCH_EDITOR ?? `code`,
       }),
       VitePluginRadar({

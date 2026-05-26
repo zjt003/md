@@ -57,7 +57,7 @@ export const useUIStore = defineStore(`ui`, () => {
   const toggleImageReupload = useToggle(enableImageReupload)
 
   // 是否开启同步滚动（编辑器与预览区联动）
-  const enableScrollSync = store.reactive(addPrefix(`enableScrollSync`), false)
+  const enableScrollSync = store.reactive(addPrefix(`enableScrollSync`), true)
   const toggleScrollSync = useToggle(enableScrollSync)
 
   // ==================== 对话框状态 ====================
@@ -76,6 +76,30 @@ export const useUIStore = defineStore(`ui`, () => {
   // 是否展示上传图片对话框
   const isShowUploadImgDialog = ref(false)
   const toggleShowUploadImgDialog = useToggle(isShowUploadImgDialog)
+
+  // 是否展示公式编辑对话框
+  const isShowFormulaEditorDialog = ref(false)
+  const formulaEditorValue = ref(``)
+  const formulaEditorDisplayMode = ref(true)
+  const formulaEditorSourceRaw = ref<string | null>(null)
+
+  function openFormulaEditor(options: {
+    value?: string
+    displayMode?: boolean
+    sourceRaw?: string | null
+  } = {}) {
+    formulaEditorValue.value = options.value ?? ``
+    formulaEditorDisplayMode.value = options.displayMode ?? true
+    formulaEditorSourceRaw.value = options.sourceRaw ?? null
+    isShowFormulaEditorDialog.value = true
+  }
+
+  function closeFormulaEditor() {
+    isShowFormulaEditorDialog.value = false
+    formulaEditorValue.value = ``
+    formulaEditorDisplayMode.value = true
+    formulaEditorSourceRaw.value = null
+  }
 
   // 是否展示导入 Markdown 对话框
   const isShowImportMdDialog = ref(false)
@@ -163,6 +187,12 @@ export const useUIStore = defineStore(`ui`, () => {
     toggleShowInsertMpCardDialog,
     isShowUploadImgDialog,
     toggleShowUploadImgDialog,
+    isShowFormulaEditorDialog,
+    formulaEditorValue,
+    formulaEditorDisplayMode,
+    formulaEditorSourceRaw,
+    openFormulaEditor,
+    closeFormulaEditor,
     isShowImportMdDialog,
     toggleShowImportMdDialog,
     importMdOpenUrl,

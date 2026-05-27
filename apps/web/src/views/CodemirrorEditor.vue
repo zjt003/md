@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import EditorPanel from '@/components/editor/EditorPanel.vue'
-import FormulaEditorDialog from '@/components/editor/FormulaEditorDialog.vue'
 import FolderSourcePanel from '@/components/editor/FolderSourcePanel.vue'
+import FormulaEditorDialog from '@/components/editor/FormulaEditorDialog.vue'
+import LocalImageUploadDialog from '@/components/editor/LocalImageUploadDialog.vue'
 import PreviewPanel from '@/components/editor/PreviewPanel.vue'
 import {
   ResizableHandle,
@@ -154,6 +155,7 @@ onUnmounted(() => {
       >
         <ResizablePanelGroup direction="horizontal">
           <ResizablePanel
+            class="post-slider-panel"
             :default-size="isMobile ? 0 : 15"
             :max-size="!isMobile && isOpenPostSlider ? 20 : 0"
             :min-size="!isMobile && isOpenPostSlider ? 10 : 0"
@@ -162,6 +164,7 @@ onUnmounted(() => {
           </ResizablePanel>
           <ResizableHandle class="hidden md:block" />
           <ResizablePanel
+            class="folder-panel"
             :default-size="!isMobile && isOpenFolderPanel ? 15 : 0"
             :max-size="!isMobile && isOpenFolderPanel ? 25 : 0"
             :min-size="!isMobile && isOpenFolderPanel ? 10 : 0"
@@ -220,10 +223,10 @@ onUnmounted(() => {
               </ResizablePanel>
 
               <!-- 样式面板 -->
-              <ResizableHandle v-show="!isMobile && isOpenRightSlider" class="hidden md:block" />
+              <ResizableHandle v-show="!isMobile && isOpenRightSlider" class="hidden md:block right-slider-handle" />
               <ResizablePanel
-                v-if="isOpenRightSlider"
                 ref="rightSliderPanelRef"
+                class="right-slider-panel"
                 :order="4"
                 :default-size="0"
                 :min-size="!isMobile && isOpenRightSlider ? 25 : 0"
@@ -252,6 +255,8 @@ onUnmounted(() => {
 
       <ImportMarkdownDialog />
 
+      <LocalImageUploadDialog />
+
       <FormulaEditorDialog />
 
       <TemplateDialog />
@@ -274,5 +279,21 @@ onUnmounted(() => {
 
 .container-main {
   overflow: hidden;
+}
+
+.right-slider-panel {
+  transition: flex-grow 300ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.post-slider-panel {
+  transition: flex-grow 300ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.folder-panel {
+  transition: flex-grow 300ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.right-slider-handle {
+  transition: opacity 300ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 </style>

@@ -1,6 +1,7 @@
 <script setup lang='ts'>
 import { altSign, headingLevels as baseHeadingLevels, ctrlKey, ctrlSign, shiftSign } from '@md/shared/configs'
 import {
+  Blocks,
   Bold,
   ClipboardPaste,
   Copy,
@@ -52,9 +53,9 @@ const uiStore = useUIStore()
 
 const {
   toggleShowInsertFormDialog,
-  toggleShowInsertMpCardDialog,
   toggleShowUploadImgDialog,
   toggleShowImportMdDialog,
+  toggleShowComponentDialog,
 } = uiStore
 
 const { editor } = storeToRefs(editorStore)
@@ -171,9 +172,9 @@ function downloadAsCardImage() {
             <Table class="mr-2 h-4 w-4" />
             表格
           </ContextMenuItem>
-          <ContextMenuItem @click="toggleShowInsertMpCardDialog()">
-            <FileText class="mr-2 h-4 w-4" />
-            公众号名片
+          <ContextMenuItem @click="toggleShowComponentDialog()">
+            <Blocks class="mr-2 h-4 w-4" />
+            自定义组件
           </ContextMenuItem>
         </ContextMenuSubContent>
       </ContextMenuSub>

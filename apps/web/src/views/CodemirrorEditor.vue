@@ -135,10 +135,6 @@ onMounted(() => {
 
 // --- 进度条 ---
 const progressValue = computed(() => editorPanelCompRef.value?.progressValue ?? 0)
-
-// --- 清理 ---
-onUnmounted(() => {
-})
 </script>
 
 <template>
@@ -250,8 +246,6 @@ onUnmounted(() => {
       <UploadImgDialog @upload-image="handleUploadImage" />
 
       <InsertFormDialog />
-
-      <InsertMpCardDialog />
 
       <ImportMarkdownDialog />
 

@@ -37,7 +37,7 @@ const formData = reactive({
   template: '',
 })
 
-const propRows = ref<PropRow[]>([{ name: '', description: '', default: '', required: false }])
+const propRows = ref<PropRow[]>([])
 
 const formErrors = reactive({
   name: '',
@@ -53,7 +53,7 @@ function openCreateForm() {
   formData.name = ''
   formData.description = ''
   formData.template = ''
-  propRows.value = [{ name: '', description: '', default: '', required: false }]
+  propRows.value = []
   formErrors.name = ''
   formErrors.template = ''
   isShowForm.value = true
@@ -72,7 +72,7 @@ function openEditForm(def: CustomComponentDef) {
         default: p.default || '',
         required: !!p.required,
       }))
-    : [{ name: '', description: '', default: '', required: false }]
+    : []
   formErrors.name = ''
   formErrors.template = ''
   isShowForm.value = true
@@ -83,10 +83,9 @@ function addPropRow() {
 }
 
 function removePropRow(idx: number) {
+  if (idx < 0 || idx >= propRows.value.length)
+    return
   propRows.value.splice(idx, 1)
-  if (propRows.value.length === 0) {
-    propRows.value.push({ name: '', description: '', default: '', required: false })
-  }
 }
 
 function validate(): boolean {
@@ -187,7 +186,12 @@ function onUpdate(val: boolean) {
 // ──────────────────────────────────────────────
 // 展开/折叠详情
 // ──────────────────────────────────────────────
+const activeComponentTab = ref<'builtin' | 'custom'>('builtin')
 const expandedId = ref<string | null>(null)
+
+watch(activeComponentTab, () => {
+  expandedId.value = null
+})
 
 function toggleExpand(id: string) {
   expandedId.value = expandedId.value === id ? null : id
@@ -346,46 +350,51 @@ watch(() => uiStore.isShowComponentDialog, (val) => {
                 添加 Prop
               </Button>
             </div>
-            <!-- 桌面端：网格表头 -->
-            <div class="hidden sm:grid grid-cols-12 gap-2 px-1">
-              <span class="col-span-3 text-xs text-muted-foreground">名称</span>
-              <span class="col-span-4 text-xs text-muted-foreground">描述</span>
-              <span class="col-span-3 text-xs text-muted-foreground">默认值</span>
-              <span class="col-span-2" />
-            </div>
-            <div class="space-y-2">
-              <div
-                v-for="(row, idx) in propRows"
-                :key="idx"
-                class="flex flex-col sm:grid sm:grid-cols-12 gap-2 items-start sm:items-center p-3 sm:p-0 border sm:border-0 rounded-lg sm:rounded-none bg-muted/20 sm:bg-transparent"
-              >
-                <div class="w-full sm:col-span-3 flex gap-1 items-center">
-                  <span class="text-xs text-muted-foreground sm:hidden w-12 shrink-0">名称</span>
-                  <Input v-model="row.name" placeholder="propName" class="h-8 text-sm flex-1" />
-                </div>
-                <div class="w-full sm:col-span-4 flex gap-1 items-center">
-                  <span class="text-xs text-muted-foreground sm:hidden w-12 shrink-0">描述</span>
-                  <Input v-model="row.description" placeholder="描述" class="h-8 text-sm flex-1" />
-                </div>
-                <div class="w-full sm:col-span-3 flex gap-1 items-center">
-                  <span class="text-xs text-muted-foreground sm:hidden w-12 shrink-0">默认值</span>
-                  <Input v-model="row.default" placeholder="默认值" class="h-8 text-sm flex-1" />
-                </div>
-                <div class="flex items-center gap-2 sm:col-span-2 sm:justify-center">
-                  <label class="flex items-center gap-1 text-xs cursor-pointer select-none">
-                    <input v-model="row.required" type="checkbox" class="cursor-pointer">
-                    必填
-                  </label>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    class="size-7 text-muted-foreground hover:text-red-500"
-                    @click="removePropRow(idx)"
-                  >
-                    <Trash2 class="size-3.5" />
-                  </Button>
+            <template v-if="propRows.length > 0">
+              <!-- 桌面端：网格表头 -->
+              <div class="hidden sm:grid grid-cols-12 gap-2 px-1">
+                <span class="col-span-3 text-xs text-muted-foreground">名称</span>
+                <span class="col-span-4 text-xs text-muted-foreground">描述</span>
+                <span class="col-span-3 text-xs text-muted-foreground">默认值</span>
+                <span class="col-span-2" />
+              </div>
+              <div class="space-y-2">
+                <div
+                  v-for="(row, idx) in propRows"
+                  :key="idx"
+                  class="flex flex-col sm:grid sm:grid-cols-12 gap-2 items-start sm:items-center p-3 sm:p-0 border sm:border-0 rounded-lg sm:rounded-none bg-muted/20 sm:bg-transparent"
+                >
+                  <div class="w-full sm:col-span-3 flex gap-1 items-center">
+                    <span class="text-xs text-muted-foreground sm:hidden w-12 shrink-0">名称</span>
+                    <Input v-model="row.name" placeholder="propName" class="h-8 text-sm flex-1" />
+                  </div>
+                  <div class="w-full sm:col-span-4 flex gap-1 items-center">
+                    <span class="text-xs text-muted-foreground sm:hidden w-12 shrink-0">描述</span>
+                    <Input v-model="row.description" placeholder="描述" class="h-8 text-sm flex-1" />
+                  </div>
+                  <div class="w-full sm:col-span-3 flex gap-1 items-center">
+                    <span class="text-xs text-muted-foreground sm:hidden w-12 shrink-0">默认值</span>
+                    <Input v-model="row.default" placeholder="默认值" class="h-8 text-sm flex-1" />
+                  </div>
+                  <div class="flex items-center gap-2 sm:col-span-2 sm:justify-center">
+                    <label class="flex items-center gap-1 text-xs cursor-pointer select-none">
+                      <input v-model="row.required" type="checkbox" class="cursor-pointer">
+                      必填
+                    </label>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      class="size-7 text-muted-foreground hover:text-red-500"
+                      @click="removePropRow(idx)"
+                    >
+                      <Trash2 class="size-3.5" />
+                    </Button>
+                  </div>
                 </div>
               </div>
+            </template>
+            <div v-else class="rounded-lg border border-dashed bg-muted/20 px-3 py-4 text-xs text-muted-foreground">
+              当前组件没有 Props。需要时可点击“添加 Prop”新增。
             </div>
             <p class="text-xs text-muted-foreground">
               在模板中使用 <code class="bg-muted px-1 rounded">&#123;&#123;propName&#125;&#125;</code> 引用 prop 值
@@ -426,44 +435,36 @@ watch(() => uiStore.isShowComponentDialog, (val) => {
 
         <!-- ─── 组件列表 ─── -->
         <div v-if="!isShowForm">
-          <!-- 空状态 -->
-          <div v-if="componentStore.allComponents.length === 0" class="text-center py-16">
-            <Blocks class="mx-auto size-12 text-muted-foreground/40 mb-3" />
-            <p class="text-sm text-muted-foreground mb-4">
-              暂无组件，点击新建
-            </p>
-            <Button variant="outline" size="sm" @click="openCreateForm">
-              <Plus class="mr-1.5 size-3.5" />
-              新建组件
-            </Button>
-          </div>
+          <Tabs v-model="activeComponentTab" class="w-full">
+            <TabsList class="grid w-full grid-cols-2">
+              <TabsTrigger value="builtin">
+                <span class="inline-flex items-center gap-1.5">
+                  <Lock class="size-3.5" />
+                  内置组件
+                </span>
+              </TabsTrigger>
+              <TabsTrigger value="custom">
+                <span class="inline-flex items-center gap-1.5">
+                  <Blocks class="size-3.5" />
+                  自定义组件
+                </span>
+              </TabsTrigger>
+            </TabsList>
 
-          <!-- ── 内置组件 ── -->
-          <section class="mb-6">
-            <div class="flex items-center gap-1.5 mb-3">
-              <Lock class="size-3.5 text-muted-foreground" />
-              <h4 class="text-sm font-medium text-muted-foreground">
-                内置组件
-              </h4>
-              <span class="text-xs text-muted-foreground/60">（只读，不可删除）</span>
-            </div>
-            <div class="space-y-2">
+            <TabsContent value="builtin" class="mt-4 space-y-2">
               <div
                 v-for="def in componentStore.builtInComponents"
                 :key="def.id"
                 class="border rounded-xl overflow-hidden transition-all"
-                :class="expandedId === def.id ? 'border-primary/30 bg-primary/[0.02]' : 'hover:border-border/80 bg-card'"
+                :class="expandedId === def.id ? 'border-primary/30 bg-primary/2' : 'hover:border-border/80 bg-card'"
               >
-                <!-- 卡片头部：始终可见 -->
                 <div
                   class="flex items-start sm:items-center gap-3 p-3 sm:p-4 cursor-pointer select-none"
                   @click="toggleExpand(def.id)"
                 >
-                  <!-- 图标区 -->
                   <div class="size-8 sm:size-9 shrink-0 rounded-lg bg-primary/10 flex items-center justify-center">
                     <Blocks class="size-4 text-primary" />
                   </div>
-                  <!-- 名称 & 描述 -->
                   <div class="flex-1 min-w-0">
                     <div class="flex flex-wrap items-center gap-1.5 mb-0.5">
                       <code class="text-sm font-semibold text-primary">{{ def.name }}</code>
@@ -476,7 +477,6 @@ watch(() => uiStore.isShowComponentDialog, (val) => {
                       {{ def.description }}
                     </p>
                   </div>
-                  <!-- 操作按钮 -->
                   <div class="flex items-center gap-1 shrink-0" @click.stop>
                     <Button
                       variant="default"
@@ -501,7 +501,6 @@ watch(() => uiStore.isShowComponentDialog, (val) => {
                   </div>
                 </div>
 
-                <!-- 展开详情 -->
                 <Transition
                   enter-active-class="transition-all duration-200 ease-out"
                   enter-from-class="opacity-0 -translate-y-1"
@@ -511,12 +510,10 @@ watch(() => uiStore.isShowComponentDialog, (val) => {
                   leave-to-class="opacity-0 -translate-y-1"
                 >
                   <div v-if="expandedId === def.id" class="border-t px-3 sm:px-4 py-3 space-y-3 bg-muted/20">
-                    <!-- Props 表格 -->
                     <div v-if="def.props.length > 0">
                       <p class="text-xs font-medium text-muted-foreground mb-2">
                         属性说明
                       </p>
-                      <!-- 桌面端表格 -->
                       <div class="hidden sm:block rounded-lg border overflow-hidden">
                         <table class="w-full text-xs">
                           <thead class="bg-muted/50">
@@ -561,7 +558,6 @@ watch(() => uiStore.isShowComponentDialog, (val) => {
                           </tbody>
                         </table>
                       </div>
-                      <!-- 移动端卡片列表 -->
                       <div class="sm:hidden space-y-2">
                         <div
                           v-for="prop in def.props"
@@ -586,7 +582,6 @@ watch(() => uiStore.isShowComponentDialog, (val) => {
                       </div>
                     </div>
 
-                    <!-- 使用示例 -->
                     <div>
                       <p class="text-xs font-medium text-muted-foreground mb-1.5">
                         使用示例
@@ -605,7 +600,6 @@ watch(() => uiStore.isShowComponentDialog, (val) => {
                       </div>
                     </div>
 
-                    <!-- MpProfile: 已保存的公众号账号 -->
                     <div v-if="isMpProfile(def)" class="border-t pt-3 space-y-2">
                       <div class="flex items-center justify-between">
                         <p class="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
@@ -652,7 +646,7 @@ watch(() => uiStore.isShowComponentDialog, (val) => {
                                   <Zap class="size-3" />
                                 </Button>
                               </TooltipTrigger>
-                              <TooltipContent side="top" class="z-[250]">
+                              <TooltipContent side="top" class="z-250">
                                 插入
                               </TooltipContent>
                             </Tooltip>
@@ -664,7 +658,7 @@ watch(() => uiStore.isShowComponentDialog, (val) => {
                                   <Pencil class="size-3" />
                                 </Button>
                               </TooltipTrigger>
-                              <TooltipContent side="top" class="z-[250]">
+                              <TooltipContent side="top" class="z-250">
                                 编辑
                               </TooltipContent>
                             </Tooltip>
@@ -676,7 +670,7 @@ watch(() => uiStore.isShowComponentDialog, (val) => {
                                   <Trash2 class="size-3" />
                                 </Button>
                               </TooltipTrigger>
-                              <TooltipContent side="top" class="z-[250]">
+                              <TooltipContent side="top" class="z-250">
                                 删除
                               </TooltipContent>
                             </Tooltip>
@@ -687,215 +681,207 @@ watch(() => uiStore.isShowComponentDialog, (val) => {
                   </div>
                 </Transition>
               </div>
-            </div>
-          </section>
+            </TabsContent>
 
-          <!-- ── 自定义组件 ── -->
-          <section>
-            <div class="flex items-center justify-between mb-3">
-              <div class="flex items-center gap-1.5">
-                <Blocks class="size-3.5 text-muted-foreground" />
-                <h4 class="text-sm font-medium text-muted-foreground">
-                  自定义组件
-                </h4>
-                <span class="text-xs text-muted-foreground/60">
-                  {{ componentStore.userComponents.length }} 个
-                </span>
-              </div>
-              <Button variant="outline" size="sm" class="h-6 px-2 text-xs" @click="openCreateForm">
-                <Plus class="mr-1 size-3" />
-                新建
-              </Button>
-            </div>
-            <div v-if="componentStore.userComponents.length === 0" class="text-center py-8">
-              <p class="text-xs text-muted-foreground">
-                暂无自定义组件，点击上方"新建"按钮创建
-              </p>
-            </div>
-            <div v-else class="space-y-2">
-              <div
-                v-for="def in componentStore.userComponents"
-                :key="def.id"
-                class="border rounded-xl overflow-hidden transition-all"
-                :class="expandedId === def.id ? 'border-primary/30 bg-primary/[0.02]' : 'hover:border-border/80 bg-card'"
-              >
-                <!-- 卡片头部 -->
-                <div
-                  class="flex items-start sm:items-center gap-3 p-3 sm:p-4 cursor-pointer select-none"
-                  @click="toggleExpand(def.id)"
-                >
-                  <div class="size-8 sm:size-9 shrink-0 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <Blocks class="size-4 text-primary" />
-                  </div>
-                  <div class="flex-1 min-w-0">
-                    <div class="flex flex-wrap items-center gap-1.5 mb-0.5">
-                      <code class="text-sm font-semibold text-foreground">{{ def.name }}</code>
-                      <span class="text-[10px] border px-1.5 py-px rounded-full bg-muted text-muted-foreground">
-                        {{ def.props.length }} 个属性
-                      </span>
-                    </div>
-                    <p v-if="def.description" class="text-xs text-muted-foreground leading-relaxed line-clamp-1">
-                      {{ def.description }}
-                    </p>
-                  </div>
-                  <div class="flex items-center gap-1 shrink-0" @click.stop>
-                    <Button
-                      variant="default"
-                      size="sm"
-                      class="h-7 px-2.5 text-xs gap-1"
-                      @click="insertSnippet(def)"
-                    >
-                      <Zap class="size-3" />
-                      插入
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      class="size-7 text-muted-foreground"
-                      @click="toggleExpand(def.id)"
-                    >
-                      <ChevronDown
-                        class="size-3.5 transition-transform duration-200"
-                        :class="{ 'rotate-180': expandedId === def.id }"
-                      />
-                    </Button>
-                  </div>
+            <TabsContent value="custom" class="mt-4 space-y-4">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-1.5">
+                  <Blocks class="size-3.5 text-muted-foreground" />
+                  <h4 class="text-sm font-medium text-muted-foreground">
+                    自定义组件
+                  </h4>
+                  <span class="text-xs text-muted-foreground/60">
+                    {{ componentStore.userComponents.length }} 个
+                  </span>
                 </div>
-
-                <!-- 展开详情 -->
-                <Transition
-                  enter-active-class="transition-all duration-200 ease-out"
-                  enter-from-class="opacity-0 -translate-y-1"
-                  enter-to-class="opacity-100 translate-y-0"
-                  leave-active-class="transition-all duration-150 ease-in"
-                  leave-from-class="opacity-100 translate-y-0"
-                  leave-to-class="opacity-0 -translate-y-1"
+                <Button variant="outline" size="sm" class="h-6 px-2 text-xs" @click="openCreateForm">
+                  <Plus class="mr-1 size-3" />
+                  新建
+                </Button>
+              </div>
+              <div v-if="componentStore.userComponents.length === 0" class="text-center py-8 border rounded-xl bg-card/50">
+                <p class="text-xs text-muted-foreground">
+                  暂无自定义组件，点击上方“新建”按钮创建
+                </p>
+              </div>
+              <div v-else class="space-y-2">
+                <div
+                  v-for="def in componentStore.userComponents"
+                  :key="def.id"
+                  class="border rounded-xl overflow-hidden transition-all"
+                  :class="expandedId === def.id ? 'border-primary/30 bg-primary/2' : 'hover:border-border/80 bg-card'"
                 >
-                  <div v-if="expandedId === def.id" class="border-t px-3 sm:px-4 py-3 space-y-3 bg-muted/20">
-                    <!-- Props 表格 -->
-                    <div v-if="def.props.length > 0">
-                      <p class="text-xs font-medium text-muted-foreground mb-2">
-                        属性说明
-                      </p>
-                      <!-- 桌面端表格 -->
-                      <div class="hidden sm:block rounded-lg border overflow-hidden">
-                        <table class="w-full text-xs">
-                          <thead class="bg-muted/50">
-                            <tr>
-                              <th class="text-left px-3 py-2 font-medium text-muted-foreground w-28">
-                                属性名
-                              </th>
-                              <th class="text-left px-3 py-2 font-medium text-muted-foreground w-16">
-                                状态
-                              </th>
-                              <th class="text-left px-3 py-2 font-medium text-muted-foreground">
-                                描述
-                              </th>
-                              <th class="text-left px-3 py-2 font-medium text-muted-foreground w-24">
-                                默认值
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            <tr
-                              v-for="prop in def.props"
-                              :key="prop.name"
-                              class="border-t border-border/50"
-                            >
-                              <td class="px-3 py-2">
-                                <code class="font-mono text-primary font-medium">{{ prop.name }}</code>
-                              </td>
-                              <td class="px-3 py-2">
-                                <span
-                                  class="inline-flex items-center px-1.5 py-0.5 rounded border text-[10px] font-medium"
-                                  :class="propTypeBadge(prop).class"
-                                >{{ propTypeBadge(prop).label }}</span>
-                              </td>
-                              <td class="px-3 py-2 text-muted-foreground">
-                                {{ prop.description || '—' }}
-                              </td>
-                              <td class="px-3 py-2">
-                                <code v-if="prop.default" class="text-[11px] bg-muted px-1.5 py-0.5 rounded text-foreground">{{ prop.default }}</code>
-                                <span v-else class="text-muted-foreground/50">—</span>
-                              </td>
-                            </tr>
-                          </tbody>
-                        </table>
+                  <div
+                    class="flex items-start sm:items-center gap-3 p-3 sm:p-4 cursor-pointer select-none"
+                    @click="toggleExpand(def.id)"
+                  >
+                    <div class="size-8 sm:size-9 shrink-0 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <Blocks class="size-4 text-primary" />
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <div class="flex flex-wrap items-center gap-1.5 mb-0.5">
+                        <code class="text-sm font-semibold text-foreground">{{ def.name }}</code>
+                        <span class="text-[10px] border px-1.5 py-px rounded-full bg-muted text-muted-foreground">
+                          {{ def.props.length }} 个属性
+                        </span>
                       </div>
-                      <!-- 移动端卡片列表 -->
-                      <div class="sm:hidden space-y-2">
-                        <div
-                          v-for="prop in def.props"
-                          :key="prop.name"
-                          class="rounded-lg border bg-card p-3 space-y-1"
-                        >
-                          <div class="flex items-center gap-2">
-                            <code class="font-mono text-sm font-semibold text-primary">{{ prop.name }}</code>
-                            <span
-                              class="inline-flex items-center px-1.5 py-0.5 rounded border text-[10px] font-medium"
-                              :class="propTypeBadge(prop).class"
-                            >{{ propTypeBadge(prop).label }}</span>
-                          </div>
-                          <p v-if="prop.description" class="text-xs text-muted-foreground">
-                            {{ prop.description }}
-                          </p>
-                          <div v-if="prop.default" class="flex items-center gap-1 text-xs text-muted-foreground">
-                            <span>默认：</span>
-                            <code class="bg-muted px-1.5 py-0.5 rounded text-foreground">{{ prop.default }}</code>
+                      <p v-if="def.description" class="text-xs text-muted-foreground leading-relaxed line-clamp-1">
+                        {{ def.description }}
+                      </p>
+                    </div>
+                    <div class="flex items-center gap-1 shrink-0" @click.stop>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        class="h-7 px-2.5 text-xs gap-1"
+                        @click="insertSnippet(def)"
+                      >
+                        <Zap class="size-3" />
+                        插入
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        class="size-7 text-muted-foreground"
+                        @click="toggleExpand(def.id)"
+                      >
+                        <ChevronDown
+                          class="size-3.5 transition-transform duration-200"
+                          :class="{ 'rotate-180': expandedId === def.id }"
+                        />
+                      </Button>
+                    </div>
+                  </div>
+
+                  <Transition
+                    enter-active-class="transition-all duration-200 ease-out"
+                    enter-from-class="opacity-0 -translate-y-1"
+                    enter-to-class="opacity-100 translate-y-0"
+                    leave-active-class="transition-all duration-150 ease-in"
+                    leave-from-class="opacity-100 translate-y-0"
+                    leave-to-class="opacity-0 -translate-y-1"
+                  >
+                    <div v-if="expandedId === def.id" class="border-t px-3 sm:px-4 py-3 space-y-3 bg-muted/20">
+                      <div v-if="def.props.length > 0">
+                        <p class="text-xs font-medium text-muted-foreground mb-2">
+                          属性说明
+                        </p>
+                        <div class="hidden sm:block rounded-lg border overflow-hidden">
+                          <table class="w-full text-xs">
+                            <thead class="bg-muted/50">
+                              <tr>
+                                <th class="text-left px-3 py-2 font-medium text-muted-foreground w-28">
+                                  属性名
+                                </th>
+                                <th class="text-left px-3 py-2 font-medium text-muted-foreground w-16">
+                                  状态
+                                </th>
+                                <th class="text-left px-3 py-2 font-medium text-muted-foreground">
+                                  描述
+                                </th>
+                                <th class="text-left px-3 py-2 font-medium text-muted-foreground w-24">
+                                  默认值
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr
+                                v-for="prop in def.props"
+                                :key="prop.name"
+                                class="border-t border-border/50"
+                              >
+                                <td class="px-3 py-2">
+                                  <code class="font-mono text-primary font-medium">{{ prop.name }}</code>
+                                </td>
+                                <td class="px-3 py-2">
+                                  <span
+                                    class="inline-flex items-center px-1.5 py-0.5 rounded border text-[10px] font-medium"
+                                    :class="propTypeBadge(prop).class"
+                                  >{{ propTypeBadge(prop).label }}</span>
+                                </td>
+                                <td class="px-3 py-2 text-muted-foreground">
+                                  {{ prop.description || '—' }}
+                                </td>
+                                <td class="px-3 py-2">
+                                  <code v-if="prop.default" class="text-[11px] bg-muted px-1.5 py-0.5 rounded text-foreground">{{ prop.default }}</code>
+                                  <span v-else class="text-muted-foreground/50">—</span>
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                        <div class="sm:hidden space-y-2">
+                          <div
+                            v-for="prop in def.props"
+                            :key="prop.name"
+                            class="rounded-lg border bg-card p-3 space-y-1"
+                          >
+                            <div class="flex items-center gap-2">
+                              <code class="font-mono text-sm font-semibold text-primary">{{ prop.name }}</code>
+                              <span
+                                class="inline-flex items-center px-1.5 py-0.5 rounded border text-[10px] font-medium"
+                                :class="propTypeBadge(prop).class"
+                              >{{ propTypeBadge(prop).label }}</span>
+                            </div>
+                            <p v-if="prop.description" class="text-xs text-muted-foreground">
+                              {{ prop.description }}
+                            </p>
+                            <div v-if="prop.default" class="flex items-center gap-1 text-xs text-muted-foreground">
+                              <span>默认：</span>
+                              <code class="bg-muted px-1.5 py-0.5 rounded text-foreground">{{ prop.default }}</code>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                    <div v-else>
-                      <p class="text-xs text-muted-foreground italic">
-                        该组件无属性定义
-                      </p>
-                    </div>
+                      <div v-else>
+                        <p class="text-xs text-muted-foreground italic">
+                          该组件无属性定义
+                        </p>
+                      </div>
 
-                    <!-- 使用示例 -->
-                    <div>
-                      <p class="text-xs font-medium text-muted-foreground mb-1.5">
-                        使用示例
-                      </p>
-                      <div class="relative group">
-                        <pre class="text-xs font-mono bg-muted rounded-lg px-3 py-2.5 overflow-x-auto text-foreground/80 pr-10 leading-relaxed"><code>{{ def.example || componentStore.buildSnippet(def) }}</code></pre>
+                      <div>
+                        <p class="text-xs font-medium text-muted-foreground mb-1.5">
+                          使用示例
+                        </p>
+                        <div class="relative group">
+                          <pre class="text-xs font-mono bg-muted rounded-lg px-3 py-2.5 overflow-x-auto text-foreground/80 pr-10 leading-relaxed"><code>{{ def.example || componentStore.buildSnippet(def) }}</code></pre>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            class="absolute right-1.5 top-1.5 size-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                            @click="copySnippet(def)"
+                          >
+                            <Check v-if="copiedId === def.id" class="size-3 text-green-500" />
+                            <Copy v-else class="size-3 text-muted-foreground" />
+                          </Button>
+                        </div>
+                      </div>
+                      <div class="flex items-center gap-2 pt-1 border-t">
                         <Button
-                          variant="ghost"
-                          size="icon"
-                          class="absolute right-1.5 top-1.5 size-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                          @click="copySnippet(def)"
+                          variant="outline"
+                          size="sm"
+                          class="h-7 px-2.5 text-xs gap-1"
+                          @click="openEditForm(def)"
                         >
-                          <Check v-if="copiedId === def.id" class="size-3 text-green-500" />
-                          <Copy v-else class="size-3 text-muted-foreground" />
+                          <Pencil class="size-3" />
+                          编辑
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          class="h-7 px-2.5 text-xs gap-1 text-red-500 hover:text-red-600 hover:border-red-300"
+                          @click="openDeleteConfirm(def)"
+                        >
+                          <Trash2 class="size-3" />
+                          删除
                         </Button>
                       </div>
                     </div>
-                    <!-- 编辑 / 删除 -->
-                    <div class="flex items-center gap-2 pt-1 border-t">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        class="h-7 px-2.5 text-xs gap-1"
-                        @click="openEditForm(def)"
-                      >
-                        <Pencil class="size-3" />
-                        编辑
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        class="h-7 px-2.5 text-xs gap-1 text-red-500 hover:text-red-600 hover:border-red-300"
-                        @click="openDeleteConfirm(def)"
-                      >
-                        <Trash2 class="size-3" />
-                        删除
-                      </Button>
-                    </div>
-                  </div>
-                </Transition>
+                  </Transition>
+                </div>
               </div>
-            </div>
-          </section>
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </DialogContent>

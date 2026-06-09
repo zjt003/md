@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { FileText, Globe, Loader2, Upload } from 'lucide-vue-next'
+import { FileText, Globe, Loader2, Upload } from '@lucide/vue'
 import { usePostStore } from '@/stores/post'
 import { useUIStore } from '@/stores/ui'
 
@@ -357,7 +357,7 @@ watch(isShowImportMdDialog, (visible) => {
               基于
               <a
                 href="https://github.com/doocs/anything-md"
-                target="_blank"
+                target="_blank" rel="noopener noreferrer"
                 class="underline hover:text-muted-foreground"
               >Anything-MD</a>
               提供转换服务

@@ -19,6 +19,7 @@
     "start": "pnpm web dev",
     "web": "pnpm --filter @md/web",
     "vscode": "pnpm --prefix ./apps/vscode",
+    "vscode:test": "pnpm --prefix ./apps/vscode test",
     "mcp": "pnpm --filter @md/mcp-server",
     "cli": "pnpm --filter @doocs/md-cli",
     "build:cli": "pnpm web build && npx shx rm -rf packages/md-cli/dist && npx shx rm -rf dist/**/*.map && npx shx cp -r apps/web/dist packages/md-cli/ && cd packages/md-cli && npm pack",
@@ -32,7 +33,7 @@
   },
   "dependencies": {
     "@codemirror/state": "6.6.0",
-    "@codemirror/view": "6.43.0"
+    "@codemirror/view": "6.43.1"
   },
   "devDependencies": {
     "@antfu/eslint-config": "9.0.0",

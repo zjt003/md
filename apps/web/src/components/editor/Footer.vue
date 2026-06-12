@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { StateEffect } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
-import { ArrowUpDown, BookOpen, ChevronRight, ChevronsUpDown, Clock, Columns2, Eye, FileText, Keyboard, ListTree, Monitor, Moon, PenLine, Pilcrow, Search, Smartphone, Sun, Type } from '@lucide/vue'
+import { ArrowUpDown, BookOpen, ChevronRight, ChevronsUpDown, Clock, Cloud, CloudAlert, CloudCheck, Columns2, Eye, FileText, Keyboard, ListTree, Loader2, LogIn, Monitor, Moon, PenLine, Pilcrow, Search, Smartphone, Sun, Type, User } from '@lucide/vue'
 import {
   Popover,
   PopoverContent,
@@ -13,20 +13,53 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { isAccountUiEnabled } from '@/services/account/config'
+import { isSyncUiEnabled } from '@/services/sync/client'
+import { useAuthStore } from '@/stores/auth'
 import { useEditorStore } from '@/stores/editor'
 import { usePostStore } from '@/stores/post'
 import { useRenderStore } from '@/stores/render'
+import { useSyncStore } from '@/stores/sync'
 import { useUIStore } from '@/stores/ui'
 
 const renderStore = useRenderStore()
 const editorStore = useEditorStore()
 const postStore = usePostStore()
 const uiStore = useUIStore()
+const authStore = useAuthStore()
+const syncStore = useSyncStore()
 const { readingTime } = storeToRefs(renderStore)
 const { editor } = storeToRefs(editorStore)
 const { currentPost } = storeToRefs(postStore)
 const { isDark } = storeToRefs(uiStore)
 const { isMobile, viewMode, previewDevice, enableScrollSync } = storeToRefs(uiStore)
+const { isLoggedIn } = storeToRefs(authStore)
+const showAccountUi = isAccountUiEnabled()
+const showSyncUi = isSyncUiEnabled()
+const { isSyncing, syncState } = storeToRefs(syncStore)
+
+// 账户图标提示
+const accountTooltip = computed(() => {
+  if (!isLoggedIn.value)
+    return `登录账户`
+  return `账户 @${authStore.user?.login ?? ''}`
+})
+
+// 云同步图标提示
+const syncTooltip = computed(() => {
+  if (!isLoggedIn.value)
+    return `云同步（请先登录账户）`
+  switch (syncState.value) {
+    case `syncing`:
+      return `同步中…`
+    case `synced`:
+      return `已同步`
+    case `error`:
+      return `同步失败，点击重试`
+    default:
+      return `有未同步的更改`
+  }
+})
 
 // 相对时间格式化（复用）
 function formatRelativeTime(date: Date | string) {
@@ -613,6 +646,56 @@ const showDeviceToggle = computed(() => viewMode.value !== `edit` && !isMobile.v
         </Tooltip>
 
         <span class="hidden text-border sm:block">·</span>
+
+        <!-- 账户 -->
+        <template v-if="showAccountUi">
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button
+                aria-label="账户"
+                class="flex cursor-pointer items-center rounded p-0.5 transition-colors hover:bg-accent hover:text-foreground"
+                :class="isLoggedIn ? 'text-primary' : ''"
+                @click="uiStore.toggleShowAccountDialog(true)"
+              >
+                <img
+                  v-if="isLoggedIn && authStore.user?.avatar"
+                  :src="authStore.user.avatar"
+                  :alt="authStore.user.login"
+                  class="size-3.5 rounded-full"
+                >
+                <User v-else-if="isLoggedIn" class="size-3" />
+                <LogIn v-else class="size-3" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" :side-offset="6" class="text-xs text-muted-foreground">
+              <p>{{ accountTooltip }}</p>
+            </TooltipContent>
+          </Tooltip>
+          <span class="hidden text-border sm:block">·</span>
+        </template>
+
+        <!-- 云同步 -->
+        <template v-if="showSyncUi">
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button
+                aria-label="云同步"
+                class="flex cursor-pointer items-center rounded p-0.5 transition-colors hover:bg-accent hover:text-foreground"
+                :class="isLoggedIn ? 'text-primary' : ''"
+                @click="uiStore.toggleShowSyncDialog(true)"
+              >
+                <Loader2 v-if="isSyncing" class="size-3 animate-spin" />
+                <CloudCheck v-else-if="isLoggedIn && syncState === 'synced'" class="size-3 text-green-500" />
+                <CloudAlert v-else-if="isLoggedIn && syncState === 'error'" class="size-3 text-destructive" />
+                <Cloud v-else class="size-3" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" :side-offset="6" class="text-xs text-muted-foreground">
+              <p>{{ syncTooltip }}</p>
+            </TooltipContent>
+          </Tooltip>
+          <span class="hidden text-border sm:block">·</span>
+        </template>
 
         <!-- 深浅色切换 -->
         <Tooltip>

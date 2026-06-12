@@ -7,6 +7,7 @@ import { useThemeStore } from '@/stores/theme'
 import { useUIStore } from '@/stores/ui'
 import { addPrefix, generatePureHTML, processClipboardContent } from '@/utils'
 import { store } from '@/utils/storage'
+import AccountDialog from './AccountDialog.vue'
 import EditDropdown from './EditDropdown.vue'
 import FileDropdown from './FileDropdown.vue'
 import FormatDropdown from './FormatDropdown.vue'
@@ -14,6 +15,7 @@ import HelpDropdown from './HelpDropdown.vue'
 import InsertDropdown from './InsertDropdown.vue'
 import MarkdownHelpDialog from './MarkdownHelpDialog.vue'
 import StyleDropdown from './StyleDropdown.vue'
+import SyncDialog from './SyncDialog.vue'
 
 const emit = defineEmits([`startCopy`, `endCopy`])
 
@@ -26,7 +28,7 @@ const exportStore = useExportStore()
 const { editor } = storeToRefs(editorStore)
 const { output } = storeToRefs(renderStore)
 const { primaryColor } = storeToRefs(themeStore)
-const { isOpenRightSlider } = storeToRefs(uiStore)
+const { isOpenRightSlider, isShowSyncDialog, isShowAccountDialog } = storeToRefs(uiStore)
 
 // Editor refresh function
 function editorRefresh() {
@@ -314,6 +316,8 @@ function copyToWeChat() {
   <FundDialog :visible="fundDialogVisible" @close="fundDialogVisible = false" />
   <EditorStateDialog :visible="editorStateDialogVisible" @close="editorStateDialogVisible = false" />
   <MarkdownHelpDialog :visible="markdownHelpDialogVisible" @close="markdownHelpDialogVisible = false" />
+  <AccountDialog :visible="isShowAccountDialog" @close="isShowAccountDialog = false" />
+  <SyncDialog :visible="isShowSyncDialog" @close="isShowSyncDialog = false" />
 </template>
 
 <style lang="less" scoped>

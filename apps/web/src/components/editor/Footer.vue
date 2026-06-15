@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { StateEffect } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
-import { ArrowUpDown, BookOpen, ChevronRight, ChevronsUpDown, Clock, Cloud, CloudAlert, CloudCheck, Columns2, Eye, FileText, Keyboard, ListTree, Loader2, LogIn, Monitor, Moon, PenLine, Pilcrow, Search, Smartphone, Sun, Type, User } from '@lucide/vue'
+import { ArrowUpDown, BookOpen, ChevronRight, ChevronsUpDown, Clock, Columns2, Ellipsis, Eye, FileText, Keyboard, ListTree, LogIn, Monitor, Moon, PenLine, Pilcrow, Search, Share2, Smartphone, Sun, Type, User } from '@lucide/vue'
 import {
   Popover,
   PopoverContent,
@@ -13,13 +13,14 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { useSyncFooterMeta } from '@/composables/useSyncStatusMeta'
 import { isAccountUiEnabled } from '@/services/account/config'
+import { isShareUiEnabled } from '@/services/share/client'
 import { isSyncUiEnabled } from '@/services/sync/client'
 import { useAuthStore } from '@/stores/auth'
 import { useEditorStore } from '@/stores/editor'
 import { usePostStore } from '@/stores/post'
 import { useRenderStore } from '@/stores/render'
-import { useSyncStore } from '@/stores/sync'
 import { useUIStore } from '@/stores/ui'
 
 const renderStore = useRenderStore()
@@ -27,7 +28,6 @@ const editorStore = useEditorStore()
 const postStore = usePostStore()
 const uiStore = useUIStore()
 const authStore = useAuthStore()
-const syncStore = useSyncStore()
 const { readingTime } = storeToRefs(renderStore)
 const { editor } = storeToRefs(editorStore)
 const { currentPost } = storeToRefs(postStore)
@@ -36,30 +36,36 @@ const { isMobile, viewMode, previewDevice, enableScrollSync } = storeToRefs(uiSt
 const { isLoggedIn } = storeToRefs(authStore)
 const showAccountUi = isAccountUiEnabled()
 const showSyncUi = isSyncUiEnabled()
-const { isSyncing, syncState } = storeToRefs(syncStore)
+const showShareUi = isShareUiEnabled()
+const { syncFooterIcon, syncFooterIconClass, syncTooltip } = useSyncFooterMeta()
 
-// 账户图标提示
+const isMoreOpen = ref(false)
+
 const accountTooltip = computed(() => {
   if (!isLoggedIn.value)
     return `登录账户`
   return `账户 @${authStore.user?.login ?? ''}`
 })
 
-// 云同步图标提示
-const syncTooltip = computed(() => {
-  if (!isLoggedIn.value)
-    return `云同步（请先登录账户）`
-  switch (syncState.value) {
-    case `syncing`:
-      return `同步中…`
-    case `synced`:
-      return `已同步`
-    case `error`:
-      return `同步失败，点击重试`
-    default:
-      return `有未同步的更改`
-  }
-})
+function openAccountDialog() {
+  isMoreOpen.value = false
+  uiStore.toggleShowAccountDialog(true)
+}
+
+function openSyncDialog() {
+  isMoreOpen.value = false
+  uiStore.toggleShowSyncDialog(true)
+}
+
+function openShareDialog() {
+  isMoreOpen.value = false
+  uiStore.openShareDialog()
+}
+
+function toggleTheme() {
+  isMoreOpen.value = false
+  uiStore.toggleDark()
+}
 
 // 相对时间格式化（复用）
 function formatRelativeTime(date: Date | string) {
@@ -399,7 +405,7 @@ const showDeviceToggle = computed(() => viewMode.value !== `edit` && !isMobile.v
 
 <template>
   <footer
-    class="flex select-none items-center overflow-hidden px-3 py-1 text-xs text-muted-foreground"
+    class="flex select-none items-center overflow-hidden px-3 py-1 text-xs text-muted-foreground max-md:px-4 max-md:py-1.5 max-md:pb-[max(0.375rem,env(safe-area-inset-bottom,0px))]"
   >
     <TooltipProvider :delay-duration="300">
       <!-- 左侧：光标位置 & 选区 -->
@@ -554,9 +560,9 @@ const showDeviceToggle = computed(() => viewMode.value !== `edit` && !isMobile.v
       <div class="hidden min-w-0 flex-1 sm:block" />
 
       <!-- 右侧：统计信息 -->
-      <div class="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
+      <div class="ml-auto flex shrink-0 items-center gap-2.5 sm:gap-3.5">
         <!-- 视图模式切换 -->
-        <div class="flex items-center rounded-md border border-border/60 p-0.5">
+        <div class="flex items-center gap-0.5 rounded-md border border-border/60 p-0.5">
           <Tooltip v-for="mode in viewModes" :key="mode.key">
             <TooltipTrigger as-child>
               <button
@@ -647,72 +653,145 @@ const showDeviceToggle = computed(() => viewMode.value !== `edit` && !isMobile.v
 
         <span class="hidden text-border sm:block">·</span>
 
-        <!-- 账户 -->
-        <template v-if="showAccountUi">
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <button
-                aria-label="账户"
-                class="flex cursor-pointer items-center rounded p-0.5 transition-colors hover:bg-accent hover:text-foreground"
-                :class="isLoggedIn ? 'text-primary' : ''"
-                @click="uiStore.toggleShowAccountDialog(true)"
-              >
-                <img
-                  v-if="isLoggedIn && authStore.user?.avatar"
-                  :src="authStore.user.avatar"
-                  :alt="authStore.user.login"
-                  class="size-3.5 rounded-full"
+        <!-- 账户 & 同步 & 分享 & 主题（桌面端） -->
+        <div class="hidden items-center gap-0.5 sm:flex">
+          <template v-if="showAccountUi">
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <button
+                  aria-label="账户"
+                  class="flex cursor-pointer items-center rounded-md p-1.5 transition-colors hover:bg-accent hover:text-foreground"
+                  :class="isLoggedIn ? 'text-primary' : ''"
+                  @click="openAccountDialog"
                 >
-                <User v-else-if="isLoggedIn" class="size-3" />
-                <LogIn v-else class="size-3" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="top" :side-offset="6" class="text-xs text-muted-foreground">
-              <p>{{ accountTooltip }}</p>
-            </TooltipContent>
-          </Tooltip>
-          <span class="hidden text-border sm:block">·</span>
-        </template>
+                  <img
+                    v-if="isLoggedIn && authStore.user?.avatar"
+                    :src="authStore.user.avatar"
+                    :alt="authStore.user.login"
+                    class="size-3 rounded-full"
+                  >
+                  <User v-else-if="isLoggedIn" class="size-3" />
+                  <LogIn v-else class="size-3" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" :side-offset="6" class="text-xs text-muted-foreground">
+                <p>{{ accountTooltip }}</p>
+              </TooltipContent>
+            </Tooltip>
+          </template>
 
-        <!-- 云同步 -->
-        <template v-if="showSyncUi">
+          <template v-if="showSyncUi">
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <button
+                  aria-label="云同步"
+                  class="flex cursor-pointer items-center rounded-md p-1.5 transition-colors hover:bg-accent hover:text-foreground"
+                  @click="openSyncDialog"
+                >
+                  <component
+                    :is="syncFooterIcon"
+                    class="size-3"
+                    :class="syncFooterIconClass"
+                  />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" :side-offset="6" class="text-xs text-muted-foreground">
+                <p>{{ isLoggedIn ? syncTooltip : '云同步（请先登录账户）' }}</p>
+              </TooltipContent>
+            </Tooltip>
+          </template>
+
+          <template v-if="showShareUi">
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <button
+                  aria-label="分享预览"
+                  class="flex cursor-pointer items-center rounded-md p-1.5 transition-colors hover:bg-accent hover:text-foreground"
+                  @click="openShareDialog"
+                >
+                  <Share2 class="size-3" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" :side-offset="6" class="text-xs text-muted-foreground">
+                <p>分享预览</p>
+              </TooltipContent>
+            </Tooltip>
+          </template>
+
           <Tooltip>
             <TooltipTrigger as-child>
               <button
-                aria-label="云同步"
-                class="flex cursor-pointer items-center rounded p-0.5 transition-colors hover:bg-accent hover:text-foreground"
-                :class="isLoggedIn ? 'text-primary' : ''"
-                @click="uiStore.toggleShowSyncDialog(true)"
+                aria-label="切换深色模式"
+                class="flex cursor-pointer items-center rounded-md p-1.5 transition-colors hover:bg-accent hover:text-foreground"
+                :class="isDark ? 'text-foreground' : ''"
+                @click="toggleTheme"
               >
-                <Loader2 v-if="isSyncing" class="size-3 animate-spin" />
-                <CloudCheck v-else-if="isLoggedIn && syncState === 'synced'" class="size-3 text-green-500" />
-                <CloudAlert v-else-if="isLoggedIn && syncState === 'error'" class="size-3 text-destructive" />
-                <Cloud v-else class="size-3" />
+                <Moon v-if="isDark" class="size-3" />
+                <Sun v-else class="size-3" />
               </button>
             </TooltipTrigger>
             <TooltipContent side="top" :side-offset="6" class="text-xs text-muted-foreground">
-              <p>{{ syncTooltip }}</p>
+              <p>{{ isDark ? '浅色模式' : '深色模式' }}</p>
             </TooltipContent>
           </Tooltip>
-          <span class="hidden text-border sm:block">·</span>
-        </template>
+        </div>
 
-        <!-- 深浅色切换 -->
-        <Tooltip>
-          <TooltipTrigger as-child>
+        <!-- 移动端：更多操作 -->
+        <Popover v-model:open="isMoreOpen">
+          <PopoverTriggerPrimitive as-child>
             <button
-              class="flex cursor-pointer items-center rounded p-0.5 transition-colors hover:bg-accent hover:text-foreground"
-              :class="isDark ? 'text-foreground' : ''"
-              @click="uiStore.toggleDark()"
+              aria-label="更多操作"
+              class="flex cursor-pointer items-center rounded-md p-1.5 transition-colors hover:bg-accent hover:text-foreground sm:hidden"
             >
-              <Moon v-if="isDark" class="size-3" />
-              <Sun v-else class="size-3" />
+              <Ellipsis class="size-3" />
             </button>
-          </TooltipTrigger>
-          <TooltipContent side="top" :side-offset="6" class="text-xs text-muted-foreground">
-            <p>{{ isDark ? '浅色模式' : '深色模式' }}</p>
-          </TooltipContent>
-        </Tooltip>
+          </PopoverTriggerPrimitive>
+          <PopoverContent side="top" :side-offset="8" align="end" class="w-48 p-1">
+            <button
+              v-if="showAccountUi"
+              class="flex w-full cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs transition-colors hover:bg-accent"
+              @click="openAccountDialog"
+            >
+              <img
+                v-if="isLoggedIn && authStore.user?.avatar"
+                :src="authStore.user.avatar"
+                :alt="authStore.user.login"
+                class="size-3 rounded-full"
+              >
+              <User v-else-if="isLoggedIn" class="size-3 shrink-0" />
+              <LogIn v-else class="size-3 shrink-0" />
+              <span class="min-w-0 flex-1 truncate">{{ accountTooltip }}</span>
+            </button>
+            <button
+              v-if="showSyncUi"
+              class="flex w-full cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs transition-colors hover:bg-accent"
+              @click="openSyncDialog"
+            >
+              <component
+                :is="syncFooterIcon"
+                class="size-3 shrink-0"
+                :class="syncFooterIconClass"
+              />
+              <span>{{ isLoggedIn ? syncTooltip : '云同步' }}</span>
+            </button>
+            <button
+              v-if="showShareUi"
+              class="flex w-full cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs transition-colors hover:bg-accent"
+              @click="openShareDialog"
+            >
+              <Share2 class="size-3 shrink-0" />
+              <span>分享预览</span>
+            </button>
+            <button
+              class="flex w-full cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs transition-colors hover:bg-accent"
+              @click="toggleTheme"
+            >
+              <Moon v-if="isDark" class="size-3 shrink-0" />
+              <Sun v-else class="size-3 shrink-0" />
+              <span>{{ isDark ? '浅色模式' : '深色模式' }}</span>
+            </button>
+          </PopoverContent>
+        </Popover>
       </div>
     </TooltipProvider>
   </footer>

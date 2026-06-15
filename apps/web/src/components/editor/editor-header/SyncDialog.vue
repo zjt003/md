@@ -1,41 +1,52 @@
 <script setup lang="ts">
-import { Cloud, Info, Loader2, LogIn, RefreshCw } from '@lucide/vue'
+import { AlertCircle, Cloud, CloudOff, Loader2, LogIn, RefreshCw } from '@lucide/vue'
 import { storeToRefs } from 'pinia'
 import { computed } from 'vue'
+import CloudPanelCard from '@/components/editor/editor-header/cloud-panel/CloudPanelCard.vue'
+import CloudPanelDialog from '@/components/editor/editor-header/cloud-panel/CloudPanelDialog.vue'
+import CloudPanelState from '@/components/editor/editor-header/cloud-panel/CloudPanelState.vue'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
+import { useSyncStatusMeta } from '@/composables/useSyncStatusMeta'
 import { isSyncConfigured } from '@/services/sync/client'
 import { useAuthStore } from '@/stores/auth'
 import { useSyncStore } from '@/stores/sync'
 import { useUIStore } from '@/stores/ui'
 
-const props = defineProps({
-  visible: {
-    type: Boolean,
-    default: false,
-  },
-})
+const props = defineProps<{
+  open: boolean
+}>()
 
-const emit = defineEmits([`close`])
+const emit = defineEmits<{
+  'update:open': [value: boolean]
+}>()
 
 const authStore = useAuthStore()
 const syncStore = useSyncStore()
 const uiStore = useUIStore()
 
 const { isLoggedIn } = storeToRefs(authStore)
-const { status, lastError, lastSyncAt, needsRefresh, isSyncing } = storeToRefs(syncStore)
+const { status, lastError, lastSyncAt, isSyncing, syncState } = storeToRefs(syncStore)
+const { syncStatusMeta } = useSyncStatusMeta({ errorHint: `generic` })
+
+const dialogOpen = computed({
+  get: () => props.open,
+  set: (val: boolean) => emit(`update:open`, val),
+})
 
 const lastSyncText = computed(() => {
   if (!lastSyncAt.value)
     return `从未同步`
-  return new Date(lastSyncAt.value).toLocaleString(`zh-cn`)
+  return new Date(lastSyncAt.value).toLocaleString(`zh-CN`, {
+    month: `short`,
+    day: `numeric`,
+    hour: `2-digit`,
+    minute: `2-digit`,
+  })
 })
 
-function onUpdate(val: boolean) {
-  if (!val)
-    emit(`close`)
-}
-
 function openAccountDialog() {
-  emit(`close`)
+  dialogOpen.value = false
   uiStore.toggleShowAccountDialog(true)
 }
 
@@ -46,60 +57,78 @@ async function handleSync() {
   else
     toast.success(`同步完成`)
 }
-
-function handleReload() {
-  window.location.reload()
-}
 </script>
 
 <template>
-  <Dialog :open="props.visible" @update:open="onUpdate">
-    <DialogContent class="max-w-md gap-0 p-0">
-      <DialogHeader class="space-y-1.5 border-b px-6 py-4">
-        <DialogTitle class="flex items-center gap-2">
-          <Cloud class="size-5" />
-          云同步
-        </DialogTitle>
-        <DialogDescription>
-          多设备同步文章与设置，不含密钥。
-        </DialogDescription>
-      </DialogHeader>
+  <CloudPanelDialog
+    v-model:open="dialogOpen"
+    title="云同步"
+    description="多设备同步文章与设置，不含密钥与图床凭证。"
+    :icon="Cloud"
+  >
+    <CloudPanelState
+      v-if="!isSyncConfigured()"
+      :icon="CloudOff"
+      title="云同步未启用"
+      description="当前部署未配置同步服务，请联系部署方启用后再试。"
+      compact
+    />
 
-      <div v-if="!isSyncConfigured()" class="text-muted-foreground px-6 py-8 text-center text-sm">
-        云同步服务未配置，请联系部署方启用。
-      </div>
+    <CloudPanelState
+      v-else-if="!isLoggedIn"
+      :icon="Cloud"
+      title="登录后开启云同步"
+      action-label="登录"
+      :action-icon="LogIn"
+      @action="openAccountDialog"
+    />
 
-      <div v-else-if="!isLoggedIn" class="flex flex-col items-center gap-4 px-6 py-8">
-        <p class="text-muted-foreground text-sm">
-          请先登录账户
-        </p>
-        <Button class="gap-2" @click="openAccountDialog">
-          <LogIn class="size-4" />
-          前往登录
-        </Button>
-      </div>
+    <div v-else class="space-y-4 px-4 py-4 sm:px-6">
+      <CloudPanelCard>
+        <template #leading>
+          <div
+            class="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-background ring-1 ring-border/60"
+          >
+            <component
+              :is="syncStatusMeta.icon"
+              class="size-4"
+              :class="syncStatusMeta.iconClass"
+            />
+          </div>
+        </template>
 
-      <div v-else class="space-y-4 px-6 py-4">
-        <div class="text-muted-foreground rounded-lg border px-3 py-2 text-xs">
-          上次同步：{{ lastSyncText }}
+        <div class="space-y-1">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="inline-flex items-center gap-1.5 text-sm font-medium">
+              <span class="size-2 rounded-full" :class="syncStatusMeta.dotClass" />
+              {{ syncStatusMeta.label }}
+            </span>
+          </div>
+          <p class="text-xs leading-relaxed text-muted-foreground">
+            {{ syncStatusMeta.hint }}
+          </p>
+          <p class="text-xs tabular-nums text-muted-foreground/80">
+            上次同步：{{ lastSyncText }}
+          </p>
         </div>
+      </CloudPanelCard>
 
-        <Alert v-if="needsRefresh" class="py-2.5">
-          <Info class="size-4" />
-          <AlertDescription class="flex items-center justify-between gap-2 text-xs">
-            <span>部分设置已从云端更新，刷新后生效</span>
-            <Button size="sm" variant="outline" @click="handleReload">
-              刷新
-            </Button>
-          </AlertDescription>
-        </Alert>
+      <Alert v-if="syncState === 'error' && lastError" variant="destructive" class="py-3">
+        <AlertCircle class="size-4" />
+        <AlertDescription class="text-xs leading-relaxed">
+          {{ lastError }}
+        </AlertDescription>
+      </Alert>
+    </div>
 
-        <Button class="w-full gap-2" :disabled="isSyncing" @click="handleSync">
+    <template v-if="isSyncConfigured() && isLoggedIn" #footer>
+      <div class="border-t px-4 py-4 sm:px-6">
+        <Button class="h-10 w-full gap-2" :disabled="isSyncing" @click="handleSync">
           <Loader2 v-if="isSyncing" class="size-4 animate-spin" />
           <RefreshCw v-else class="size-4" />
-          {{ isSyncing ? '同步中…' : '手动同步' }}
+          {{ isSyncing ? '同步中…' : '立即同步' }}
         </Button>
       </div>
-    </DialogContent>
-  </Dialog>
+    </template>
+  </CloudPanelDialog>
 </template>

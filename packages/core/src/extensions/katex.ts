@@ -3,23 +3,50 @@ import type { MarkedExtension } from 'marked'
 import type { KatexRenderFn, KatexToken } from '../types/marked-tokens'
 import { asKatexRenderer } from '../types/marked-tokens'
 import { escapeHtml } from '../utils/basicHelpers'
+import {
+  blockLatexRule,
+  blockRule,
+  findInlineKatexStart,
+  inlineLatexRule,
+  inlineRule,
+  inlineRuleNonStandard,
+} from '../utils/mathDetection'
+import { ensureMathJaxLoaded, isMathJaxReady } from '../utils/mathjax'
 
 export interface MarkedKatexOptions {
   nonStandard?: boolean
 }
 
-const inlineRule = /^(\${1,2})(?!\$)((?:\\.|[^\\\n])*?(?:\\.|[^\\\n$]))\1(?=[\s?!.,:？！。，：]|$)/
-const inlineRuleNonStandard = /^(\${1,2})(?!\$)((?:\\.|[^\\\n])*?(?:\\.|[^\\\n$]))\1/ // Non-standard, even if there are no spaces before and after $ or $$, try to parse
+let mathJaxLoadRequested = false
 
-const blockRule = /^\s{0,3}(\${1,2})[ \t]*\n([\s\S]+?)\n\s{0,3}\1[ \t]*(?:\n|$)/
+function requestMathJaxLoad() {
+  if (isMathJaxReady())
+    return
+  if (mathJaxLoadRequested)
+    return
 
-// LaTeX style rules for \( ... \) and \[ ... \]
-const inlineLatexRule = /^\\\(([^\\]*(?:\\.[^\\]*)*?)\\\)/
-const blockLatexRule = /^\\\[([^\\]*(?:\\.[^\\]*)*?)\\\]/
+  mathJaxLoadRequested = true
+  ensureMathJaxLoaded()
+    .catch((error) => {
+      mathJaxLoadRequested = false
+      console.error(error)
+    })
+}
 
 function createRenderer(defaultDisplay: boolean, withStyle: boolean = true): KatexRenderFn {
   return (token: KatexToken) => {
     const display = token.displayMode ?? defaultDisplay
+    const rawAttr = escapeHtml(token.raw ?? token.text)
+
+    if (typeof window === `undefined` || !isMathJaxReady()) {
+      requestMathJaxLoad()
+
+      if (display) {
+        return `<section class="katex-block katex-pending" data-math-display="true" data-math-raw="${rawAttr}"><span>正在加载公式…</span></section>`
+      }
+
+      return `<span class="katex-inline katex-pending" data-math-display="false" data-math-raw="${rawAttr}"><span>…</span></span>`
+    }
 
     window.MathJax.texReset()
     const mjxContainer = window.MathJax.tex2svg(token.text, { display })
@@ -53,25 +80,7 @@ function inlineKatex(options: MarkedKatexOptions | undefined, renderer: KatexRen
     name: `inlineKatex`,
     level: `inline` as const,
     start(src: string) {
-      let index
-      let indexSrc = src
-
-      while (indexSrc) {
-        index = indexSrc.indexOf(`$`)
-        if (index === -1) {
-          return
-        }
-        const f = nonStandard ? index > -1 : index === 0 || indexSrc.charAt(index - 1) === ` `
-        if (f) {
-          const possibleKatex = indexSrc.substring(index)
-
-          if (possibleKatex.match(ruleReg)) {
-            return index
-          }
-        }
-
-        indexSrc = indexSrc.substring(index + 1).replace(/^\$+/, ``)
-      }
+      return findInlineKatexStart(src, !!nonStandard, ruleReg)
     },
     tokenizer(src: string) {
       const match = src.match(ruleReg)

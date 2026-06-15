@@ -1,23 +1,27 @@
 <script setup lang="ts">
 import { Copy, Loader2, Menu, Palette } from '@lucide/vue'
+import { defineAsyncComponent } from 'vue'
 import { useEditorStore } from '@/stores/editor'
 import { useExportStore } from '@/stores/export'
 import { useRenderStore } from '@/stores/render'
 import { useThemeStore } from '@/stores/theme'
 import { useUIStore } from '@/stores/ui'
-import { addPrefix, generatePureHTML, processClipboardContent } from '@/utils'
-import { store } from '@/utils/storage'
-import AccountDialog from './AccountDialog.vue'
+import { generatePureHTML, processClipboardContent } from '@/utils/export-content'
 import EditDropdown from './EditDropdown.vue'
 import FileDropdown from './FileDropdown.vue'
 import FormatDropdown from './FormatDropdown.vue'
 import HelpDropdown from './HelpDropdown.vue'
 import InsertDropdown from './InsertDropdown.vue'
-import MarkdownHelpDialog from './MarkdownHelpDialog.vue'
 import StyleDropdown from './StyleDropdown.vue'
-import SyncDialog from './SyncDialog.vue'
 
 const emit = defineEmits([`startCopy`, `endCopy`])
+const AboutDialog = defineAsyncComponent(() => import('./AboutDialog.vue'))
+const FundDialog = defineAsyncComponent(() => import('./FundDialog.vue'))
+const EditorStateDialog = defineAsyncComponent(() => import('@/components/editor/dialogs/EditorStateDialog.vue'))
+const MarkdownHelpDialog = defineAsyncComponent(() => import('./MarkdownHelpDialog.vue'))
+const AccountDialog = defineAsyncComponent(() => import('./AccountDialog.vue'))
+const SyncDialog = defineAsyncComponent(() => import('./SyncDialog.vue'))
+const ShareDialog = defineAsyncComponent(() => import('./ShareDialog.vue'))
 
 const editorStore = useEditorStore()
 const themeStore = useThemeStore()
@@ -28,7 +32,7 @@ const exportStore = useExportStore()
 const { editor } = storeToRefs(editorStore)
 const { output } = storeToRefs(renderStore)
 const { primaryColor } = storeToRefs(themeStore)
-const { isOpenRightSlider, isShowSyncDialog, isShowAccountDialog } = storeToRefs(uiStore)
+const { isOpenRightSlider, isShowSyncDialog, isShowAccountDialog, isShowShareDialog, isShowAboutDialog, isShowFundDialog, isShowEditorStateDialog, isShowMarkdownHelpDialog, copyMode } = storeToRefs(uiStore)
 
 // Editor refresh function
 function editorRefresh() {
@@ -38,29 +42,6 @@ function editorRefresh() {
   renderStore.render(raw)
 }
 
-// 对话框状态
-const aboutDialogVisible = ref(false)
-const fundDialogVisible = ref(false)
-const editorStateDialogVisible = ref(false)
-const markdownHelpDialogVisible = ref(false)
-
-function handleOpenAbout() {
-  aboutDialogVisible.value = true
-}
-
-function handleOpenFund() {
-  fundDialogVisible.value = true
-}
-
-function handleOpenEditorState() {
-  editorStateDialogVisible.value = true
-}
-
-function handleOpenMarkdownHelp() {
-  markdownHelpDialogVisible.value = true
-}
-
-const copyMode = store.reactive(addPrefix(`copyMode`), `txt`)
 const isCopying = ref(false)
 
 const { copy: copyContent } = useClipboard({
@@ -148,6 +129,7 @@ async function copy() {
         let processedClipboardContent: {
           html: string
           plainText: string
+          hasPendingAsyncContent: boolean
         }
 
         try {
@@ -157,6 +139,10 @@ async function copy() {
           toast.error(`处理 HTML 失败，请联系开发者。${normalizeErrorMessage(error)}`)
           editorRefresh()
           return
+        }
+
+        if (processedClipboardContent.hasPendingAsyncContent) {
+          toast.warning(`部分图表或公式尚未渲染完成，已跳过未加载内容。请稍后再试。`)
         }
 
         const clipboardDiv = document.getElementById(`output`)
@@ -251,12 +237,12 @@ function copyToWeChat() {
     <!-- 桌面端左侧菜单 -->
     <div class="space-x-1 hidden md:flex">
       <Menubar class="menubar border-0">
-        <FileDropdown @open-editor-state="handleOpenEditorState" />
+        <FileDropdown />
         <EditDropdown @copy="handleCopy" />
         <FormatDropdown />
         <InsertDropdown />
         <StyleDropdown />
-        <HelpDropdown @open-about="handleOpenAbout" @open-fund="handleOpenFund" @open-markdown-help="handleOpenMarkdownHelp" />
+        <HelpDropdown />
       </Menubar>
     </div>
 
@@ -270,12 +256,12 @@ function copyToWeChat() {
             </Button>
           </MenubarTrigger>
           <MenubarContent align="start">
-            <FileDropdown :as-sub="true" @open-editor-state="handleOpenEditorState" />
+            <FileDropdown :as-sub="true" />
             <EditDropdown :as-sub="true" @copy="handleCopy" />
             <FormatDropdown :as-sub="true" />
             <InsertDropdown :as-sub="true" />
             <StyleDropdown :as-sub="true" />
-            <HelpDropdown :as-sub="true" @open-about="handleOpenAbout" @open-fund="handleOpenFund" @open-markdown-help="handleOpenMarkdownHelp" />
+            <HelpDropdown :as-sub="true" />
           </MenubarContent>
         </MenubarMenu>
       </Menubar>
@@ -312,12 +298,13 @@ function copyToWeChat() {
   </header>
 
   <!-- 对话框组件，嵌套菜单无法正常挂载，需要提取层级 -->
-  <AboutDialog :visible="aboutDialogVisible" @close="aboutDialogVisible = false" />
-  <FundDialog :visible="fundDialogVisible" @close="fundDialogVisible = false" />
-  <EditorStateDialog :visible="editorStateDialogVisible" @close="editorStateDialogVisible = false" />
-  <MarkdownHelpDialog :visible="markdownHelpDialogVisible" @close="markdownHelpDialogVisible = false" />
-  <AccountDialog :visible="isShowAccountDialog" @close="isShowAccountDialog = false" />
-  <SyncDialog :visible="isShowSyncDialog" @close="isShowSyncDialog = false" />
+  <AboutDialog v-if="isShowAboutDialog" v-model:open="isShowAboutDialog" />
+  <FundDialog v-if="isShowFundDialog" v-model:open="isShowFundDialog" />
+  <EditorStateDialog v-if="isShowEditorStateDialog" v-model:open="isShowEditorStateDialog" />
+  <MarkdownHelpDialog v-if="isShowMarkdownHelpDialog" v-model:open="isShowMarkdownHelpDialog" />
+  <AccountDialog v-if="isShowAccountDialog" v-model:open="isShowAccountDialog" />
+  <SyncDialog v-if="isShowSyncDialog" v-model:open="isShowSyncDialog" />
+  <ShareDialog v-if="isShowShareDialog" v-model:open="isShowShareDialog" />
 </template>
 
 <style lang="less" scoped>

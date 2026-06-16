@@ -116,16 +116,22 @@ export const useSyncStore = defineStore(`sync`, () => {
     lastError.value = ``
 
     try {
+      const tombstones = collectLocalDocuments().filter(doc => doc.deleted)
+      if (tombstones.length) {
+        const pushed = await authStore.syncClient.push({ documents: tombstones, settings: [] })
+        cursor = Math.max(cursor, pushed.cursor)
+      }
+
       const pulled = await authStore.syncClient.pull(cursor)
 
       if (pulled.documents.length) {
         const { posts, changed } = mergeRemoteIntoLocal(postStore.posts, pulled.documents)
         if (changed)
-          postStore.posts = posts
+          await postStore.replacePostsAndPersist(posts)
       }
 
       if (pulled.settings.length) {
-        const { keys } = applyRemoteSettings(pulled.settings)
+        const { keys } = await applyRemoteSettings(pulled.settings)
         if (keys.length)
           await hydrateSyncedSettings(keys)
       }
@@ -140,6 +146,7 @@ export const useSyncStore = defineStore(`sync`, () => {
       }
 
       writeSyncedIds(postStore.posts.map(p => p.id))
+      await postStore.persistImmediately()
       lastSyncAt.value = Date.now()
       status.value = `idle`
     }

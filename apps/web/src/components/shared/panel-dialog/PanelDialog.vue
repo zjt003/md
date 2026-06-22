@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { blurFocusInsideDialogOnClose, blurFocusOutsideDialog } from '@/lib/a11y/dialog-focus'
 import { cn } from '@/lib/utils'
 
 const props = withDefaults(defineProps<{
@@ -30,6 +31,7 @@ const sizeClassMap = {
   'xl': `sm:max-w-xl`,
   '2xl': `sm:max-w-2xl`,
   '3xl': `sm:max-w-3xl`,
+  '4xl': `sm:max-w-4xl`,
 } as const
 
 const dialogContentClass = computed(() => cn(
@@ -45,11 +47,19 @@ const dialogContentClass = computed(() => cn(
 function onUpdate(val: boolean) {
   emit(`update:open`, val)
 }
+
+function onCloseAutoFocus(event: Event) {
+  blurFocusInsideDialogOnClose(event)
+}
 </script>
 
 <template>
   <Dialog :open="props.open" @update:open="onUpdate">
-    <DialogContent :class="dialogContentClass">
+    <DialogContent
+      :class="dialogContentClass"
+      @open-auto-focus="blurFocusOutsideDialog"
+      @close-auto-focus="onCloseAutoFocus"
+    >
       <div
         aria-hidden="true"
         class="mx-auto mt-2 mb-1 h-1 w-10 shrink-0 rounded-full bg-muted-foreground/25 sm:hidden"
@@ -60,8 +70,10 @@ function onUpdate(val: boolean) {
           <component :is="icon" v-if="icon" class="size-5 shrink-0 text-primary" />
           {{ title }}
         </DialogTitle>
-        <DialogDescription v-if="description" class="text-left text-sm">
-          {{ description }}
+        <DialogDescription
+          :class="cn('text-left text-sm', !description && 'sr-only')"
+        >
+          {{ description || '\u00a0' }}
         </DialogDescription>
       </DialogHeader>
 
@@ -69,7 +81,9 @@ function onUpdate(val: boolean) {
         <slot />
       </div>
 
-      <slot name="footer" />
+      <div v-if="$slots.footer" class="shrink-0 px-4 pb-4 sm:px-6">
+        <slot name="footer" />
+      </div>
     </DialogContent>
   </Dialog>
 </template>

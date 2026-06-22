@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { Heart } from '@lucide/vue'
 import { computed } from 'vue'
-import CloudPanelDialog from '@/components/editor/editor-header/cloud-panel/CloudPanelDialog.vue'
-import { Button } from '@/components/ui/button'
+import PanelDialog from '@/components/shared/panel-dialog/PanelDialog.vue'
 
 const props = defineProps<{
   open: boolean
@@ -12,33 +11,35 @@ const emit = defineEmits<{
   'update:open': [value: boolean]
 }>()
 
+const { t } = useI18n()
+
 const dialogOpen = computed({
   get: () => props.open,
   set: (val: boolean) => emit(`update:open`, val),
 })
 
-const contributors = [
+const contributors = computed(() => [
   {
     name: `yanglbme`,
     imageUrl: `https://cdn-doocs.oss-cn-shenzhen.aliyuncs.com/gh/doocs/md/images/support1.jpg`,
-    altText: `赞赏二维码 1`,
+    altText: t(`fund.qrAlt1`),
   },
   {
     name: `yangfong`,
     imageUrl: `https://cdn-doocs.oss-cn-shenzhen.aliyuncs.com/gh/doocs/md/images/support2.jpg`,
-    altText: `赞赏二维码 2`,
+    altText: t(`fund.qrAlt2`),
   },
-]
+])
 </script>
 
 <template>
-  <CloudPanelDialog
+  <PanelDialog
     v-model:open="dialogOpen"
-    title="赞赏"
-    description="若觉得项目不错，可以通过以下方式支持我们～"
+    :title="t('fund.title')"
+    :description="t('fund.description')"
     :icon="Heart"
   >
-    <div class="px-4 py-6 sm:px-6">
+    <div class="px-4 py-4 sm:px-6">
       <div class="grid grid-cols-2 gap-4">
         <div v-for="contributor in contributors" :key="contributor.name" class="text-center">
           <img
@@ -49,13 +50,5 @@ const contributors = [
         </div>
       </div>
     </div>
-
-    <template #footer>
-      <div class="border-t px-4 py-4 sm:px-6">
-        <Button variant="outline" class="h-10 w-full" @click="dialogOpen = false">
-          关闭
-        </Button>
-      </div>
-    </template>
-  </CloudPanelDialog>
+  </PanelDialog>
 </template>

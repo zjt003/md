@@ -2,10 +2,10 @@
 import { Cloud, Crown, LogOut, Settings2, Share2, User } from '@lucide/vue'
 import { storeToRefs } from 'pinia'
 import { computed } from 'vue'
-import CloudPanelCard from '@/components/editor/editor-header/cloud-panel/CloudPanelCard.vue'
-import CloudPanelDialog from '@/components/editor/editor-header/cloud-panel/CloudPanelDialog.vue'
-import CloudPanelState from '@/components/editor/editor-header/cloud-panel/CloudPanelState.vue'
+import CloudFeatureState from '@/components/editor/editor-header/cloud/CloudFeatureState.vue'
 import GitHubIcon from '@/components/icons/GitHubIcon.vue'
+import PanelCard from '@/components/shared/panel-dialog/PanelCard.vue'
+import PanelDialog from '@/components/shared/panel-dialog/PanelDialog.vue'
 import { Button } from '@/components/ui/button'
 import { isShareProUser, isShareUiEnabled } from '@/services/share/client'
 import { isSyncUiEnabled } from '@/services/sync/client'
@@ -21,6 +21,7 @@ const emit = defineEmits<{
   'update:open': [value: boolean]
 }>()
 
+const { t } = useI18n()
 const authStore = useAuthStore()
 const syncStore = useSyncStore()
 const uiStore = useUIStore()
@@ -39,7 +40,7 @@ const dialogOpen = computed({
 const dialogDescription = computed(() => {
   if (isLoggedIn.value || !isConfigured.value)
     return undefined
-  return `登录后可使用云同步、分享预览等云端能力。`
+  return t(`account.loginHint`)
 })
 
 function handleLogin() {
@@ -63,35 +64,35 @@ function openShareDialog() {
 </script>
 
 <template>
-  <CloudPanelDialog
+  <PanelDialog
     v-model:open="dialogOpen"
-    title="账户"
+    :title="t('account.title')"
     :description="dialogDescription"
     :icon="User"
   >
-    <CloudPanelState
+    <CloudFeatureState
       v-if="!isConfigured"
       :icon="Settings2"
-      title="账户服务未配置"
-      description="部署方需配置 VITE_MD_API_URL 后，方可使用登录与云同步。"
+      :title="t('account.notConfiguredTitle')"
+      :description="t('account.notConfiguredDescription')"
       compact
     >
       <code class="rounded-md border bg-muted/40 px-2 py-1 text-[11px] text-muted-foreground">
         VITE_MD_API_URL
       </code>
-    </CloudPanelState>
+    </CloudFeatureState>
 
-    <CloudPanelState
+    <CloudFeatureState
       v-else-if="!isLoggedIn"
       :icon="User"
-      title="登录你的账户"
-      action-label="GitHub 登录"
+      :title="t('account.loginTitle')"
+      :action-label="t('account.githubLogin')"
       :action-icon="GitHubIcon"
       @action="handleLogin"
     />
 
     <div v-else class="space-y-4 px-4 py-4 sm:px-6">
-      <CloudPanelCard align="center">
+      <PanelCard align="center">
         <template #leading>
           <img
             v-if="user?.avatar"
@@ -130,7 +131,7 @@ function openShareDialog() {
             @{{ user?.login }}
           </p>
         </div>
-      </CloudPanelCard>
+      </PanelCard>
 
       <div v-if="showSyncUi || showShareUi" class="grid gap-2 sm:grid-cols-2">
         <Button
@@ -140,7 +141,7 @@ function openShareDialog() {
           @click="openSyncDialog"
         >
           <Cloud class="size-4 shrink-0" />
-          云同步
+          {{ t('account.cloudSync') }}
         </Button>
         <Button
           v-if="showShareUi"
@@ -149,22 +150,18 @@ function openShareDialog() {
           @click="openShareDialog"
         >
           <Share2 class="size-4 shrink-0" />
-          分享预览
+          {{ t('account.sharePreview') }}
         </Button>
       </div>
-    </div>
 
-    <template v-if="isConfigured && isLoggedIn" #footer>
-      <div class="px-4 py-4 sm:px-6">
-        <Button
-          variant="outline"
-          class="h-10 w-full gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
-          @click="handleLogout"
-        >
-          <LogOut class="size-4" />
-          退出登录
-        </Button>
-      </div>
-    </template>
-  </CloudPanelDialog>
+      <Button
+        variant="outline"
+        class="h-10 w-full gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
+        @click="handleLogout"
+      >
+        <LogOut class="size-4" />
+        {{ t('common.logout') }}
+      </Button>
+    </div>
+  </PanelDialog>
 </template>

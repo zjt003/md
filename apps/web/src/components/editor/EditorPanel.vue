@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { Compartment, EditorState } from '@codemirror/state'
-import { EditorView, placeholder } from '@codemirror/view'
+import { Compartment, EditorState, Prec } from '@codemirror/state'
+import { EditorView, keymap, placeholder } from '@codemirror/view'
 import { markdownSetup, theme } from '@md/shared/editor'
-import { checkImage } from '@md/shared/utils/basicHelpers'
 import { toBase64 } from '@md/shared/utils/fileHelpers'
 import imageCompression from 'browser-image-compression'
 import { defineAsyncComponent } from 'vue'
@@ -11,9 +10,12 @@ import { SearchTab } from '@/components/ui/search-tab'
 import { useEditorRefresh } from '@/composables/useEditorRefresh'
 import { useImageUploader } from '@/composables/useImageUploader'
 import { completeInitialPreviewBoot } from '@/composables/useInitialPreviewBoot'
+import { useLocalizedUploadHostOptions } from '@/composables/useLocalizedUploadHosts'
 import { useSlashCommand } from '@/composables/useSlashCommand'
 import { formatLocalDateTime } from '@/i18n/translate'
+import { jumpToAdjacentHeading } from '@/lib/markdown/headingNavigation'
 import { contentHasMath, loadMathJax, MATHJAX_READY_EVENT } from '@/lib/preview/mathjax'
+import { validateImageFile } from '@/lib/upload/validate-image'
 import { fileUpload } from '@/services/upload'
 import { store } from '@/storage'
 import { useEditorStore } from '@/stores/editor'
@@ -25,6 +27,7 @@ import { useUIStore } from '@/stores/ui'
 const SidebarAIToolbar = defineAsyncComponent(() => import('@/components/ai/SidebarAIToolbar.vue'))
 
 const { t, locale } = useI18n()
+const uploadHostOptions = useLocalizedUploadHostOptions()
 const editorStore = useEditorStore()
 const postStore = usePostStore()
 const renderStore = useRenderStore()
@@ -160,7 +163,7 @@ function handleGlobalKeydown(e: KeyboardEvent) {
 
 // --- Image upload ---
 async function beforeImageUpload(file: File) {
-  const checkResult = checkImage(file)
+  const checkResult = validateImageFile(file, t)
   if (!checkResult.ok) {
     toast.error(checkResult.msg)
     return false
@@ -172,7 +175,8 @@ async function beforeImageUpload(file: File) {
   const config = await store.get(`${imgHost}Config`)
   const isValidHost = imgHost === `default` || config
   if (!isValidHost) {
-    toast.error(t('editorPanel.configureImgHost', { host: imgHost }))
+    const hostLabel = uploadHostOptions.value.find(option => option.value === imgHost)?.label ?? imgHost
+    toast.error(t('editorPanel.configureImgHost', { host: hostLabel }))
     toggleShowUploadImgDialog(true)
     return false
   }
@@ -452,7 +456,12 @@ function createFormTextArea(dom: HTMLDivElement) {
       markdownSetup({
         onSearch: openSearchWithSelection,
         onReplace: openReplaceWithSelection,
+        onGoToLine: () => uiStore.requestGoToLine(),
       }),
+      Prec.high(keymap.of([
+        { key: `Mod-Alt-ArrowUp`, run: view => jumpToAdjacentHeading(view, `prev`) },
+        { key: `Mod-Alt-ArrowDown`, run: view => jumpToAdjacentHeading(view, `next`) },
+      ])),
       placeholderCompartment.of(editorPlaceholder()),
       themeCompartment.of(theme(isDark.value)),
       EditorView.updateListener.of((update) => {

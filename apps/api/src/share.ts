@@ -1,5 +1,6 @@
 import type { Context } from 'hono'
-import type { CreateShareRequest, ShareHtmlSnapshot } from './share-types'
+import type { ShareFooterAuthor } from './share-page'
+import type { CreateShareRequest, ShareExpiresMode, ShareHtmlSnapshot } from './share-types'
 import type { Env } from './types'
 import { getCookie, setCookie } from 'hono/cookie'
 import { getUserById } from './db'
@@ -21,7 +22,7 @@ import {
   updateShareContent,
 } from './share-db'
 import { buildShareGateHtml } from './share-gate-page'
-import { buildSharePageHtml, injectShareViewCount } from './share-page'
+import { buildSharePageHtml, injectShareFooter } from './share-page'
 import {
   generateSharePassword,
   hashSharePassword,
@@ -38,6 +39,12 @@ import { sanitizeHtmlSnapshot, sanitizeStylesSnapshot, SHARE_PAGE_CSP } from './
 const MAX_SNAPSHOT_BYTES = 2 * 1024 * 1024
 const MAX_POST_ID_LENGTH = 64
 const SHARE_EXPIRE_MS = 24 * 60 * 60 * 1000
+const SHARE_EXPIRE_MS_BY_MODE: Record<ShareExpiresMode, number | null> = {
+  '1d': SHARE_EXPIRE_MS,
+  '7d': 7 * SHARE_EXPIRE_MS,
+  '30d': 30 * SHARE_EXPIRE_MS,
+  'never': null,
+}
 const UNLOCK_ATTEMPT_LIMIT = 20
 
 async function deriveShareId(userId: string, postId: string): Promise<string> {
@@ -80,6 +87,23 @@ function parsePostId(value: unknown): string | null {
   if (!postId || postId.length > MAX_POST_ID_LENGTH)
     return null
   return postId
+}
+
+function parseShareExpiresMode(value: unknown): ShareExpiresMode | null {
+  if (value === `1d` || value === `7d` || value === `30d` || value === `never`)
+    return value
+  return null
+}
+
+function resolveShareExpiresAt(
+  body: CreateShareRequest,
+  plan: ReturnType<typeof getEffectivePlan>,
+  now: number,
+): number | null {
+  const requested = parseShareExpiresMode(body.expiresMode) ?? `1d`
+  const mode: ShareExpiresMode = plan === `pro` ? requested : `1d`
+  const delta = SHARE_EXPIRE_MS_BY_MODE[mode]
+  return delta == null ? null : now + delta
 }
 
 function buildShareUrl(c: Context<{ Bindings: Env, Variables: { userId: string } }>, id: string): string {
@@ -286,7 +310,7 @@ export async function createShareHandler(c: Context<{ Bindings: Env, Variables: 
   const existing = await getShareByUserAndPostId(c.env.DB, userId, postId)
 
   const now = Date.now()
-  const expiresAt = now + SHARE_EXPIRE_MS
+  const expiresAt = resolveShareExpiresAt(body, plan, now)
   const title = typeof body.title === `string` ? body.title.trim().slice(0, 200) : ``
   const id = existing?.id ?? await deriveShareId(userId, postId)
 
@@ -336,6 +360,16 @@ export async function createShareHandler(c: Context<{ Bindings: Env, Variables: 
   })
 }
 
+async function resolveShareAuthor(db: D1Database, userId: string): Promise<ShareFooterAuthor> {
+  const user = await getUserById(db, userId)
+  if (!user)
+    return { displayName: `未知用户` }
+
+  return {
+    displayName: user.name?.trim() || user.login,
+  }
+}
+
 export async function viewShareHandler(c: Context<{ Bindings: Env }>) {
   const id = c.req.param(`shareId`)
   if (!id || !SHARE_ID_RE.test(id))
@@ -353,13 +387,17 @@ export async function viewShareHandler(c: Context<{ Bindings: Env }>) {
     if (!unlocked) {
       const error = c.req.query(`error`)
       const gateError = error === `rate_limited` || error === `invalid` ? error : undefined
-      return shareHtml(c, buildShareGateHtml(id, share.title, { error: gateError }))
+      const author = await resolveShareAuthor(c.env.DB, share.user_id)
+      return shareHtml(c, buildShareGateHtml(id, share.title, { error: gateError, author }))
     }
   }
 
-  const viewCount = await incrementShareViewCount(c.env.DB, id)
+  const [viewCount, author] = await Promise.all([
+    incrementShareViewCount(c.env.DB, id),
+    resolveShareAuthor(c.env.DB, share.user_id),
+  ])
 
-  return shareHtml(c, injectShareViewCount(share.html, viewCount))
+  return shareHtml(c, injectShareFooter(share.html, author, viewCount))
 }
 
 export async function unlockShareHandler(c: Context<{ Bindings: Env }>) {

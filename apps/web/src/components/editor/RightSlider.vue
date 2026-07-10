@@ -34,6 +34,7 @@ const {
   isCiteStatus,
   isUseIndent,
   isUseJustify,
+  isCountStatus,
 } = storeToRefs(themeStore)
 
 const { scheduleEditorRefresh, editorRefresh } = useEditorRefresh()
@@ -157,6 +158,16 @@ function setUseJustify(checked: boolean) {
     useJustifyChanged()
 }
 
+function countStatusChanged() {
+  themeStore.isCountStatus = !themeStore.isCountStatus
+  editorRefresh()
+}
+
+function setCountStatus(checked: boolean) {
+  if (checked !== isCountStatus.value)
+    countStatusChanged()
+}
+
 function resetStyleConfirm() {
   confirmStore.confirm({
     title: t(`confirm.tip`),
@@ -190,6 +201,11 @@ watch(isMobile, () => {
 const pickColorsContainer = useTemplateRef<HTMLElement | undefined>(`pickColorsContainer`)
 const format = ref<Format>(`rgb`)
 const formatOptions = ref<Format[]>([`rgb`, `hex`, `hsl`, `hsv`])
+
+// 右侧栏收窄时，主题色只显示色块
+const colorGridRef = useTemplateRef<HTMLElement | undefined>(`colorGridRef`)
+const { width: colorGridWidth } = useElementSize(colorGridRef)
+const isColorCompact = computed(() => colorGridWidth.value > 0 && colorGridWidth.value < 280)
 </script>
 
 <template>
@@ -232,7 +248,7 @@ const formatOptions = ref<Format[]>([`rgb`, `hex`, `hsl`, `hsv`])
         <div class="grid grid-cols-3 gap-2">
           <Button
             v-for="{ label, value } in localizedStyleOptions.themeOptions" :key="value" class="h-auto w-full px-1.5 py-2 text-xs whitespace-nowrap" variant="outline" :class="{
-              'border-primary ring-1 ring-primary/20 border-2': theme === value,
+              'bg-accent text-accent-foreground ring-1 ring-primary/20 border-primary': theme === value,
             }" @click="themeChanged(value)"
           >
             {{ label }}
@@ -246,7 +262,7 @@ const formatOptions = ref<Format[]>([`rgb`, `hex`, `hsl`, `hsv`])
         <div class="grid grid-cols-3 gap-2">
           <Button
             v-for="{ label, value } in localizedStyleOptions.fontFamilyOptions" :key="value" variant="outline" class="h-auto w-full px-1.5 py-2 text-xs whitespace-nowrap"
-            :class="{ 'border-primary ring-1 ring-primary/20 border-2': fontFamily === value }" @click="fontChanged(value)"
+            :class="{ 'bg-accent text-accent-foreground ring-1 ring-primary/20 border-primary': fontFamily === value }" @click="fontChanged(value)"
           >
             {{ label }}
           </Button>
@@ -259,7 +275,7 @@ const formatOptions = ref<Format[]>([`rgb`, `hex`, `hsl`, `hsv`])
         <div class="grid grid-cols-5 gap-1.5">
           <Button
             v-for="{ label, value, desc } in localizedStyleOptions.fontSizeOptions" :key="value" variant="outline" class="h-auto w-full px-1 py-2 text-xs whitespace-nowrap" :title="desc" :class="{
-              'border-primary ring-1 ring-primary/20 border-2': fontSize === value,
+              'bg-accent text-accent-foreground ring-1 ring-primary/20 border-primary': fontSize === value,
             }" @click="sizeChanged(value)"
           >
             {{ label }}
@@ -270,18 +286,31 @@ const formatOptions = ref<Format[]>([`rgb`, `hex`, `hsl`, `hsv`])
         <h2 class="text-sm font-medium">
           {{ t('menu.primaryColor') }}
         </h2>
-        <div class="grid grid-cols-3 gap-2">
+        <div
+          ref="colorGridRef"
+          class="grid gap-2"
+          :class="isColorCompact ? 'grid-cols-4 sm:grid-cols-5' : 'grid-cols-3'"
+        >
           <Button
-            v-for="{ label, value } in localizedStyleOptions.colorOptions" :key="value" class="h-auto w-full px-1.5 py-2 text-xs whitespace-nowrap" variant="outline" :class="{
-              'border-primary ring-1 ring-primary/20 border-2': primaryColor === value,
-            }" @click="colorChanged(value)"
+            v-for="{ label, value } in localizedStyleOptions.colorOptions"
+            :key="value"
+            class="h-auto w-full text-xs whitespace-nowrap"
+            :class="[
+              isColorCompact ? 'justify-center px-1 py-2' : 'px-1.5 py-2',
+              {
+                'bg-accent text-accent-foreground ring-1 ring-primary/20 border-primary': primaryColor === value,
+              },
+            ]"
+            variant="outline"
+            :title="label"
+            @click="colorChanged(value)"
           >
             <span
-              class="mr-1.5 inline-block size-3 shrink-0 rounded-full" :style="{
-                background: value,
-              }"
+              class="inline-block shrink-0 rounded-full"
+              :class="isColorCompact ? 'size-4' : 'mr-1.5 size-3'"
+              :style="{ background: value }"
             />
-            {{ label }}
+            <span v-if="!isColorCompact">{{ label }}</span>
           </Button>
         </div>
       </div>
@@ -346,7 +375,7 @@ const formatOptions = ref<Format[]>([`rgb`, `hex`, `hsl`, `hsv`])
         <div class="grid grid-cols-2 gap-2">
           <Button
             v-for="{ label, value } in localizedStyleOptions.legendOptions" :key="value" class="h-auto w-full px-1.5 py-2 text-xs whitespace-nowrap" variant="outline" :class="{
-              'border-primary ring-1 ring-primary/20 border-2': legend === value,
+              'bg-accent text-accent-foreground ring-1 ring-primary/20 border-primary': legend === value,
             }" @click="legendChanged(value)"
           >
             {{ label }}
@@ -372,6 +401,10 @@ const formatOptions = ref<Format[]>([`rgb`, `hex`, `hsl`, `hsv`])
       <div class="flex items-center justify-between gap-3">
         <Label for="use-justify" class="min-w-0 shrink text-xs leading-snug sm:text-sm">{{ t('rightSlider.paragraphJustify') }}</Label>
         <Switch id="use-justify" class="shrink-0" :model-value="isUseJustify" @update:model-value="setUseJustify" />
+      </div>
+      <div class="flex items-center justify-between gap-3">
+        <Label for="count-status" class="min-w-0 shrink text-xs leading-snug sm:text-sm">{{ t('rightSlider.wordCount') }}</Label>
+        <Switch id="count-status" class="shrink-0" :model-value="isCountStatus" @update:model-value="setCountStatus" />
       </div>
       <div class="space-y-2">
         <h2 class="text-sm font-medium">

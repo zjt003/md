@@ -442,7 +442,7 @@ watch(() => uiStore.isShowComponentDialog, (val) => {
             <Input
               id="comp-name"
               v-model="formData.name"
-              placeholder="QRCodeBlock"
+              :placeholder="t('component.namePlaceholder')"
               :class="{ 'border-red-500': formErrors.name }"
             />
             <p v-if="formErrors.name" class="text-sm text-red-500">
@@ -684,7 +684,7 @@ watch(() => uiStore.isShowComponentDialog, (val) => {
                               <th class="text-left px-3 py-2 font-medium text-muted-foreground w-16">
                                 {{ t('component.typeCol') }}
                               </th>
-                              <th class="text-left px-3 py-2 font-medium text-muted-foreground w-14">
+                              <th class="text-left px-3 py-2 font-medium text-muted-foreground w-16">
                                 {{ t('component.statusCol') }}
                               </th>
                               <th class="text-left px-3 py-2 font-medium text-muted-foreground">
@@ -954,7 +954,7 @@ watch(() => uiStore.isShowComponentDialog, (val) => {
                                 <th class="text-left px-3 py-2 font-medium text-muted-foreground w-16">
                                   {{ t('component.typeCol') }}
                                 </th>
-                                <th class="text-left px-3 py-2 font-medium text-muted-foreground w-14">
+                                <th class="text-left px-3 py-2 font-medium text-muted-foreground w-16">
                                   {{ t('component.statusCol') }}
                                 </th>
                                 <th class="text-left px-3 py-2 font-medium text-muted-foreground">

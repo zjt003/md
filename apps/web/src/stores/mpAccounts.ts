@@ -1,4 +1,3 @@
-import { v4 as uuidv4 } from 'uuid'
 import { t } from '@/i18n/translate'
 import { store } from '@/storage'
 import { addPrefix } from '@/storage/prefix'
@@ -12,14 +11,14 @@ export interface MpAccount {
   logo: string
   desc: string
   /**
-   * 1: 公众号
-   * 2: 服务号
+   * 1: subscription account
+   * 2: service account
    */
   serviceType: `1` | `2`
   /**
-   * 0: 无标识
-   * 1: 个人认证
-   * 2: 企业认证
+   * 0: unverified
+   * 1: personal verification
+   * 2: enterprise verification
    */
   verify: `0` | `1` | `2`
 }
@@ -38,7 +37,7 @@ export const useMpAccountsStore = defineStore(`mpAccounts`, () => {
 
   function addAccount(data?: Partial<Omit<MpAccount, 'id'>>): MpAccount {
     const newAccount: MpAccount = {
-      id: uuidv4(),
+      id: crypto.randomUUID(),
       mpId: data?.mpId ?? ``,
       name: data?.name ?? t('store.mpAccount.newAccount'),
       logo: data?.logo ?? ``,

@@ -35,19 +35,20 @@ function docToPost(doc: SyncDocument): Post {
   }
 }
 
-/** 把败方内容并入胜方历史，避免数据丢失（按内容去重） */
-function mergeHistory(winner: Post, loserContent: string, loserDatetime: number): void {
+/** Merge loser content into winner history (dedupe by content). Returns true when entries were added. */
+function mergeHistory(winner: Post, loserContent: string, loserDatetime: number): boolean {
   if (!loserContent)
-    return
+    return false
   const history: PostHistory[] = winner.history ?? (winner.history = [])
   const exists = history.some(h => h.content === loserContent)
     || winner.content === loserContent
   if (exists)
-    return
+    return false
   history.push({
     datetime: formatLocalDateTime(new Date(loserDatetime)),
     content: loserContent,
   })
+  return true
 }
 
 export interface MergeResult {
@@ -56,10 +57,10 @@ export interface MergeResult {
 }
 
 /**
- * 将远端文档合并进本地文章列表。
- * - 按 updateDatetime 做 last-write-wins
- * - 败方内容并入胜方 history 兜底
- * - 远端软删除且更新时间较新时，从本地移除
+ * Merge remote documents into the local post list.
+ * - Last-write-wins by updateDatetime
+ * - Loser content is appended to winner history as a safety net
+ * - Remote soft-delete with newer timestamp removes the local post
  */
 export function mergeRemoteIntoLocal(localPosts: Post[], remoteDocs: SyncDocument[]): MergeResult {
   const localMap = new Map(localPosts.map(p => [p.id, p]))
@@ -69,7 +70,6 @@ export function mergeRemoteIntoLocal(localPosts: Post[], remoteDocs: SyncDocumen
     const local = localMap.get(doc.id)
 
     if (!local) {
-      // 本地不存在
       if (!doc.deleted) {
         localMap.set(doc.id, docToPost(doc))
         changed = true
@@ -81,7 +81,6 @@ export function mergeRemoteIntoLocal(localPosts: Post[], remoteDocs: SyncDocumen
     const remoteMs = doc.updateDatetime
 
     if (remoteMs > localMs) {
-      // 远端较新
       if (doc.deleted) {
         localMap.delete(doc.id)
         changed = true
@@ -95,10 +94,9 @@ export function mergeRemoteIntoLocal(localPosts: Post[], remoteDocs: SyncDocumen
       }
     }
     else {
-      // 本地较新（或同时）：保留本地，远端内容并入历史兜底
       if (!doc.deleted && doc.content !== local.content) {
-        mergeHistory(local, doc.content, remoteMs)
-        changed = true
+        if (mergeHistory(local, doc.content, remoteMs))
+          changed = true
       }
     }
   }

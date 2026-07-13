@@ -2,30 +2,11 @@ import { stripUnresolvedAsyncPlaceholders, waitForPreviewReady } from '@/lib/pre
 import { useEditorStore } from '@/stores/editor'
 import { useRenderStore } from '@/stores/render'
 import { useUIStore } from '@/stores/ui'
+import { createEmptyNode, modifyHtmlStructure, solveWeChatImage } from './clipboard-dom'
 import { getStylesToAdd } from './share-styles'
 import { prepareMathFormulasForWeChat, sanitizeSvgsForWeChat } from './wechat-svg'
 
-export function solveWeChatImage(container?: HTMLElement) {
-  const clipboardDiv = container ?? document.getElementById(`output`)
-  if (!clipboardDiv)
-    return
-  const images = clipboardDiv.getElementsByTagName(`img`)
-
-  Array.from(images).forEach((image) => {
-    const width = image.getAttribute(`width`)
-    const height = image.getAttribute(`height`)
-
-    if (width) {
-      image.removeAttribute(`width`)
-      image.style.width = /^\d+$/.test(width) ? `${width}px` : width
-    }
-
-    if (height) {
-      image.removeAttribute(`height`)
-      image.style.height = /^\d+$/.test(height) ? `${height}px` : height
-    }
-  })
-}
+export { modifyHtmlStructure, solveWeChatImage } from './clipboard-dom'
 
 async function mergeCss(html: string): Promise<string> {
   const { default: juice } = await import(`juice`)
@@ -36,30 +17,10 @@ async function mergeCss(html: string): Promise<string> {
   })
 }
 
-function modifyHtmlStructure(htmlString: string): string {
-  const tempDiv = document.createElement(`div`)
-  tempDiv.innerHTML = htmlString
-
-  tempDiv.querySelectorAll(`li > ul, li > ol`).forEach((originalItem) => {
-    originalItem.parentElement?.insertAdjacentElement(`afterend`, originalItem)
-  })
-
-  return tempDiv.innerHTML
-}
-
-function createEmptyNode(): HTMLElement {
-  const node = document.createElement(`p`)
-  node.style.fontSize = `0`
-  node.style.lineHeight = `0`
-  node.style.margin = `0`
-  node.innerHTML = `&nbsp;`
-  return node
-}
-
 /**
  * Prepare clipboard HTML for WeChat.
- * Diagrams are always exported in light theme (WeChat does not remap SVG colors;
- * dual-theme @media/class wrappers violate WeChat SVG constraints).
+ * Diagrams are exported in light theme structure, but dark ink colors are remapped
+ * to currentColor so WeChat reader dark mode can follow text color.
  */
 export async function processClipboardContent(primaryColor: string) {
   const outputElement = document.getElementById(`output`)
@@ -79,7 +40,7 @@ export async function processClipboardContent(primaryColor: string) {
   const rerenderForLight = uiStore.isDark
 
   if (rerenderForLight)
-    renderStore.render(content, { themeMode: wechatThemeMode })
+    renderStore.render(content, { themeMode: wechatThemeMode, force: true })
 
   const previewReady = await waitForPreviewReady(undefined, { themeMode: wechatThemeMode })
 
@@ -145,7 +106,7 @@ export async function processClipboardContent(primaryColor: string) {
     clipboardDiv.innerHTML = clipboardDiv.innerHTML
       .replace(
         /<tspan([^>]*)>/g,
-        `<tspan$1 style="fill: #333333 !important; color: #333333 !important; stroke: none !important;">`,
+        `<tspan$1 style="fill: currentColor !important; color: currentColor !important; stroke: none !important;">`,
       )
 
     clipboardDiv.querySelectorAll(`.infographic-diagram`).forEach((diagram) => {
@@ -181,6 +142,6 @@ export async function processClipboardContent(primaryColor: string) {
   }
   finally {
     if (rerenderForLight)
-      renderStore.render(content, { themeMode: `dark` })
+      renderStore.render(content, { themeMode: `dark`, force: true })
   }
 }

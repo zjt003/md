@@ -34,6 +34,9 @@ const UNDERSCORE_REGEX = /_/g
 const HEADING_TAG_REGEX = /^h\d$/
 const PARAGRAPH_WRAPPER_REGEX = /^<p(?:\s[^>]*)?>([\s\S]*?)<\/p>/
 const MP_WEIXIN_LINK_REGEX = /^https?:\/\/mp\.weixin\.qq\.com/
+/** Locale-neutral English fallbacks; Web injects localized strings via IOpts. */
+const DEFAULT_COUNT_SUMMARY = `{words} words, about {minutes} min read`
+const DEFAULT_FOOTNOTE_TITLE = `References`
 
 const ADDITION_STYLE = `
     <style>
@@ -64,11 +67,8 @@ function buildFootnoteArray(footnotes: [number, string, string][]): string {
 
 function extractFileName(href: string): string {
   try {
-    // 移除查询参数和哈希
     const urlPath = href.split('?')[0].split('#')[0]
-    // 获取最后一个 / 之后的部分
     const fileName = urlPath.split('/').pop() || ''
-    // 移除文件扩展名
     const nameWithoutExt = fileName.replace(/\.[^.]*$/, '')
     return nameWithoutExt
   }
@@ -105,9 +105,8 @@ const macCodeSvg = `
 `.trim()
 
 /**
- * 渲染 diff-{lang} 代码块。
- * 以 `+` 开头的行显示绿色底色（新增），`-` 开头的行显示红色底色（删除），
- * 其余行正常高亮显示。
+ * Render diff-{lang} code blocks: + lines green (added), - lines red (deleted),
+ * other lines highlighted normally.
  */
 function renderDiffCode(text: string, baseLang: string): string {
   const isLangRegistered = hljs.getLanguage(baseLang)
@@ -115,7 +114,7 @@ function renderDiffCode(text: string, baseLang: string): string {
 
   const lines = text.split(`\n`)
   const prefixes = lines.map(line => line[0])
-  // 将每行去掉前缀（+/-/ ）后拼接，整体高亮一次以避免逐行调用 hljs
+  // Strip +/- prefixes and highlight once to avoid per-line hljs calls
   const strippedLines = lines.map((line, i) => {
     const p = prefixes[i]
     return (p === `+` || p === `-`) ? line.slice(1) : line
@@ -149,7 +148,7 @@ function renderDiffCode(text: string, baseLang: string): string {
     .join(``)
 
   const span = `<span class="mac-sign" style="padding: 10px 14px 0;">${macCodeSvg}</span>`
-  // 与普通代码块一致：用单个块级容器包裹，避免 code 上的 -webkit-box 把多行 span 横向摆放导致错位
+  // Same -webkit-box wrapper as normal code blocks (see highlightAndFormatCode)
   return `<pre class="hljs code__pre">${span}<code class="language-diff-${baseLang}"><span class="code-block__inner" style="display:block">${rendered}</span></code></pre>`
 }
 
@@ -198,13 +197,6 @@ export function initRenderer(opts: IOpts = {}): RendererAPI {
     return opts
   }
 
-  /**
-   * 生成带 CSS 类的内容（新主题系统）
-   * @param styleLabel CSS 类名标识
-   * @param content 内容
-   * @param tagName HTML 标签名（可选）
-   * @param style 内联样式（可选）
-   */
   function styledContent(styleLabel: string, content: string, tagName?: string, style?: string): string {
     const tag = tagName ?? styleLabel
     const className = `${styleLabel.replace(UNDERSCORE_REGEX, `-`)}`
@@ -214,13 +206,11 @@ export function initRenderer(opts: IOpts = {}): RendererAPI {
   }
 
   function addFootnote(title: string, link: string): number {
-    // 检查是否已经存在相同的链接
     const existingFootnote = footnotes.find(([, , existingLink]) => existingLink === link)
     if (existingFootnote) {
-      return existingFootnote[0] // 返回已存在的脚注索引
+      return existingFootnote[0]
     }
 
-    // 如果不存在，创建新的脚注
     footnotes.push([++footnoteIndex, title, link])
     return footnoteIndex
   }
@@ -237,6 +227,15 @@ export function initRenderer(opts: IOpts = {}): RendererAPI {
     opts = { ...opts, ...newOpts }
   }
 
+  function formatCountSummary(words: number, minutes: number): string {
+    const template = opts.countMessages?.summary || DEFAULT_COUNT_SUMMARY
+    return template
+      .split(`{words}`)
+      .join(String(words))
+      .split(`{minutes}`)
+      .join(String(minutes))
+  }
+
   function buildReadingTime(readingTime: ReadTimeResults): string {
     if (!opts.countStatus) {
       return ``
@@ -244,9 +243,10 @@ export function initRenderer(opts: IOpts = {}): RendererAPI {
     if (!readingTime.words) {
       return ``
     }
+    const minutes = Math.ceil(readingTime.minutes)
     return `
       <blockquote class="md-blockquote">
-        <p class="md-blockquote-p">字数 ${readingTime?.words}，阅读大约需 ${Math.ceil(readingTime?.minutes)} 分钟</p>
+        <p class="md-blockquote-p">${formatCountSummary(readingTime.words, minutes)}</p>
       </blockquote>
     `
   }
@@ -256,8 +256,9 @@ export function initRenderer(opts: IOpts = {}): RendererAPI {
       return ``
     }
 
+    const footnoteTitle = opts.renderMessages?.footnoteTitle || DEFAULT_FOOTNOTE_TITLE
     return (
-      styledContent(`h4`, `引用链接`)
+      styledContent(`h4`, footnoteTitle)
       + styledContent(`footnotes`, buildFootnoteArray(footnotes), `p`)
     )
   }
@@ -282,14 +283,13 @@ export function initRenderer(opts: IOpts = {}): RendererAPI {
 
     blockquote({ tokens }: Tokens.Blockquote): string {
       const text = this.parser.parse(tokens)
-      // 新主题系统：blockquote 内的 p 标签由 CSS 选择器 `blockquote p` 控制
+      // Theme CSS targets blockquote p via `blockquote p`
       return styledContent(`blockquote`, text)
     },
 
     code({ text, lang = `` }: Tokens.Code): string {
       const langText = lang.split(` `)[0]
 
-      // diff-{lang} 语法：将代码渲染为 diff 对比视图（+/- 行着色）
       if (langText.startsWith(`diff-`)) {
         return renderDiffCode(text, langText.slice(5))
       }
@@ -300,7 +300,7 @@ export function initRenderer(opts: IOpts = {}): RendererAPI {
       const highlighted = highlightAndFormatCode(text, language, hljs, !!opts.isShowLineNumber)
 
       const span = `<span class="mac-sign" style="padding: 10px 14px 0;">${macCodeSvg}</span>`
-      // 如果语言未注册，添加 data-language-pending 属性和原始代码文本用于后续动态加载
+      // Defer highlighting until grammar loads from CDN
       let pendingAttr = ``
       if (!isLanguageRegistered && langText !== `plaintext`) {
         const escapedText = text.replace(DOUBLE_QUOTE_REGEX, `&quot;`)
@@ -333,19 +333,16 @@ export function initRenderer(opts: IOpts = {}): RendererAPI {
       )
     },
 
-    // 2. listitem：从栈顶取 ordered + counter，计算 prefix 并自增
     listitem(token: Tokens.ListItem) {
       const ordered = listOrderedStack[listOrderedStack.length - 1]
       const idx = listCounters[listCounters.length - 1]!
 
-      // 准备下一个
       listCounters[listCounters.length - 1] = idx + 1
 
       const prefix = ordered
         ? `${idx}. `
         : `• `
 
-      // 渲染内容：优先 inline，fallback 去掉 <p> 包裹
       let content: string
       try {
         content = this.parser.parseInline(token.tokens)
@@ -448,21 +445,26 @@ export function initRenderer(opts: IOpts = {}): RendererAPI {
   }
 
   markdownParser.use({ renderer })
-  // 新主题系统：扩展不再需要 styles 参数
-  // 通过闭包传入注册表 getter，避免直接依赖全局状态
-  markdownParser.use(markedComponent(() => opts.components ?? getBuiltInRegistry()))
+  // Registry getter via closure avoids global state
+  markdownParser.use(markedComponent(
+    () => opts.components ?? getBuiltInRegistry(),
+    () => opts.renderMessages,
+  ))
   markdownParser.use(markedMarkup())
   markdownParser.use(markedToc())
   markdownParser.use(markedSlider())
   markdownParser.use(markedAlert({}))
-  markdownParser.use(MDKatex({ nonStandard: true }, true))
+  markdownParser.use(MDKatex({
+    nonStandard: true,
+    getKatexLoadingMessage: () => opts.renderMessages?.katexLoading,
+  }, true))
   markdownParser.use(markedFootnotes())
   markdownParser.use(markedMermaid(() => ({
     themeMode: opts.themeMode,
     diagramMessages: opts.diagramMessages,
   })))
   markdownParser.use(markedPlantUML({
-    inlineSvg: true, // 启用SVG内嵌，适用于微信公众号
+    inlineSvg: true, // Inline SVG for WeChat (no external images)
     getDiagramMessages: () => opts.diagramMessages,
     getThemeMode: () => opts.themeMode,
   }))

@@ -1,14 +1,18 @@
 import type { AppLocale } from '@/i18n/types'
-import { LOCALE_STORAGE_KEY } from '@/i18n/constants'
+import { getNextLocale, LOCALE_STORAGE_KEY } from '@/i18n/constants'
 import { detectInitialLocale } from '@/i18n/detect'
 import { getAppI18n } from '@/i18n/index'
 import enUS from '@/i18n/messages/en-US'
+import jaJP from '@/i18n/messages/ja-JP'
 import zhCN from '@/i18n/messages/zh-CN'
+import zhTW from '@/i18n/messages/zh-TW'
 import { store } from '@/storage'
 
 const META_BY_LOCALE = {
   'zh-CN': zhCN.meta,
+  'zh-TW': zhTW.meta,
   'en-US': enUS.meta,
+  'ja-JP': jaJP.meta,
 } as const
 
 function syncDocumentLocale(locale: AppLocale) {
@@ -22,7 +26,7 @@ function syncDocumentLocale(locale: AppLocale) {
     description.setAttribute(`content`, meta.description)
 }
 
-/** 供 index.html 启动屏在 IndexedDB 就绪前同步读取 */
+/** Sync locale to localStorage for index.html splash before IndexedDB is ready. */
 function syncLocaleBootCache(locale: AppLocale) {
   try {
     localStorage.setItem(LOCALE_STORAGE_KEY, locale)
@@ -57,8 +61,14 @@ export const useLocaleStore = defineStore(`locale`, () => {
     locale.value = value
   }
 
+  /** Cycle to the next locale in SUPPORTED_LOCALES order. */
+  function cycleLocale() {
+    locale.value = getNextLocale(locale.value)
+  }
+
   return {
     locale,
     setLocale,
+    cycleLocale,
   }
 })

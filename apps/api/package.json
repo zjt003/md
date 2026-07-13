@@ -9,15 +9,18 @@
     "deploy": "wrangler deploy --minify",
     "db:migrate:local": "wrangler d1 migrations apply md-sync --local",
     "db:migrate:remote": "wrangler d1 migrations apply md-sync --remote",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
-    "hono": "^4.12.28"
+    "hono": "^4.12.29"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "5.20260708.1",
-    "@types/node": "^26.1.1",
-    "typescript": "~6.0.3",
-    "wrangler": "^4.110.0"
+    "@cloudflare/workers-types": "catalog:",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "wrangler": "catalog:"
   }
 }

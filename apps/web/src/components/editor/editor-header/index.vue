@@ -26,6 +26,7 @@ const KeyboardShortcutsDialog = defineAsyncComponent(() => import('./KeyboardSho
 const AccountDialog = defineAsyncComponent(() => import('./AccountDialog.vue'))
 const SyncDialog = defineAsyncComponent(() => import('./SyncDialog.vue'))
 const ShareDialog = defineAsyncComponent(() => import('./ShareDialog.vue'))
+const PdfExportDialog = defineAsyncComponent(() => import('@/components/editor/dialogs/PdfExportDialog.vue'))
 
 const editorStore = useEditorStore()
 const themeStore = useThemeStore()
@@ -37,7 +38,7 @@ const { editorRefresh } = useEditorRefresh()
 const { editor } = storeToRefs(editorStore)
 const { output } = storeToRefs(renderStore)
 const { primaryColor } = storeToRefs(themeStore)
-const { isOpenRightSlider, isShowSyncDialog, isShowAccountDialog, isShowShareDialog, isShowAboutDialog, isShowFundDialog, isShowEditorStateDialog, isShowPreferencesDialog, isShowMarkdownHelpDialog, isShowKeyboardShortcutsDialog, copyMode } = storeToRefs(uiStore)
+const { isOpenRightSlider, isShowSyncDialog, isShowAccountDialog, isShowShareDialog, isShowPdfExportDialog, isShowAboutDialog, isShowFundDialog, isShowEditorStateDialog, isShowPreferencesDialog, isShowMarkdownHelpDialog, isShowKeyboardShortcutsDialog, copyMode } = storeToRefs(uiStore)
 
 const isCopying = ref(false)
 
@@ -97,11 +98,9 @@ function fallbackCopyUsingExecCommand(htmlContent: string) {
   return successful
 }
 
-// 复制到微信公众号
 async function copy() {
   isCopying.value = true
 
-  // 如果是 Markdown 源码，直接复制并返回
   if (copyMode.value === `md`) {
     try {
       const mdContent = editor.value?.state.doc.toString() || ``
@@ -117,7 +116,6 @@ async function copy() {
     return
   }
 
-  // 以下处理非 Markdown 的复制流程
   emit(`startCopy`)
 
   setTimeout(() => {
@@ -189,7 +187,6 @@ async function copy() {
           await copyContent(exportStore.editorContent2HTML())
         }
 
-        // 输出提示
         toast.success(
           copyMode.value === `html`
             ? t(`toast.copiedHtml`)
@@ -231,7 +228,6 @@ function copyToWeChat() {
   <header
     class="header-container h-15 flex flex-wrap items-center justify-between px-5 relative"
   >
-    <!-- 桌面端左侧菜单 -->
     <div class="space-x-1 hidden md:flex">
       <Menubar class="menubar border-0">
         <FileDropdown />
@@ -243,7 +239,6 @@ function copyToWeChat() {
       </Menubar>
     </div>
 
-    <!-- 移动端汉堡菜单按钮 -->
     <div class="md:hidden">
       <Menubar class="menubar border-0 p-0">
         <MenubarMenu>
@@ -264,9 +259,7 @@ function copyToWeChat() {
       </Menubar>
     </div>
 
-    <!-- 右侧操作区 -->
     <div class="flex flex-wrap items-center gap-2">
-      <!-- 复制按钮 -->
       <Button
         variant="outline"
         class="h-9"
@@ -278,10 +271,8 @@ function copyToWeChat() {
         <span>{{ t('header.copy') }}</span>
       </Button>
 
-      <!-- 文章信息（移动端隐藏） -->
       <PostInfo class="hidden md:inline-flex" />
 
-      <!-- 样式面板 -->
       <Button
         variant="outline"
         class="h-9"
@@ -294,7 +285,6 @@ function copyToWeChat() {
     </div>
   </header>
 
-  <!-- 对话框组件，嵌套菜单无法正常挂载，需要提取层级 -->
   <AboutDialog v-if="isShowAboutDialog" v-model:open="isShowAboutDialog" />
   <FundDialog v-if="isShowFundDialog" v-model:open="isShowFundDialog" />
   <EditorStateDialog v-if="isShowEditorStateDialog" v-model:open="isShowEditorStateDialog" />
@@ -304,6 +294,7 @@ function copyToWeChat() {
   <AccountDialog v-if="isShowAccountDialog" v-model:open="isShowAccountDialog" />
   <SyncDialog v-if="isShowSyncDialog" v-model:open="isShowSyncDialog" />
   <ShareDialog v-if="isShowShareDialog" v-model:open="isShowShareDialog" />
+  <PdfExportDialog v-if="isShowPdfExportDialog" v-model:open="isShowPdfExportDialog" />
 </template>
 
 <style lang="less" scoped>

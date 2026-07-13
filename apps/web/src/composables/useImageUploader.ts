@@ -1,5 +1,4 @@
 import { toBase64 } from '@md/shared/utils/fileHelpers'
-import SparkMD5 from 'spark-md5'
 import { ref } from 'vue'
 import { t } from '@/i18n/translate'
 import { fileUpload } from '@/services/upload'
@@ -11,7 +10,6 @@ export function useImageUploader() {
   const isUploading = ref(false)
   const error = ref<string | null>(null)
 
-  // 获取本地缓存
   const getStorageMap = async (): Promise<Record<string, string>> => {
     return (await store.getJSON<Record<string, string>>(STORAGE_KEY, {})) ?? {}
   }
@@ -22,32 +20,19 @@ export function useImageUploader() {
     await store.setJSON(STORAGE_KEY, map)
   }
 
-  // 计算 Blob/File 的 MD5
-  const calculateHash = (file: Blob): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const fileReader = new FileReader()
-      const spark = new SparkMD5.ArrayBuffer()
-
-      fileReader.onload = (e) => {
-        if (e.target?.result) {
-          spark.append(e.target.result as ArrayBuffer)
-          resolve(spark.end())
-        }
-        else {
-          reject(new Error(t('store.uploader.fileReadFailed')))
-        }
-      }
-      fileReader.onerror = () => reject(new Error(t('store.uploader.fileReadError')))
-      fileReader.readAsArrayBuffer(file)
-    })
+  // SHA-256 for Blob/File via Web Crypto (replaces spark-md5)
+  const calculateHash = async (file: Blob): Promise<string> => {
+    const buffer = await file.arrayBuffer()
+    const digest = await crypto.subtle.digest(`SHA-256`, buffer)
+    return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, `0`)).join(``)
   }
 
-  // URL 转 File (需注意 CORS)
+  // URL → File (watch CORS)
   const urlToFile = async (url: string): Promise<File> => {
     const getFilename = (u: string) => u.split('/').pop()?.split('?')[0] || `image-${Date.now()}.png`
     const filename = getFilename(url)
 
-    // 将 http:// 升级为 https://，避免 Mixed Content 被浏览器拦截
+    // Upgrade http:// to https:// to avoid mixed-content blocking
     const safeUrl = url.replace(/^http:\/\//i, 'https://')
 
     const fetchBlob = async (targetUrl: string, options?: RequestInit) => {
@@ -80,7 +65,6 @@ export function useImageUploader() {
     }
   }
 
-  // 核心上传方法
   const upload = async (resource: string | File): Promise<string> => {
     isUploading.value = true
     error.value = null

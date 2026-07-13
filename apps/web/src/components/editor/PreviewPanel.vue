@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { DiagramDownloadOverlay } from '@/lib/preview/diagram-download'
 import { highlightPendingBlocks, hljs, hydratePendingInfographicDiagrams } from '@md/core'
+import { CONTENT_FONT_LANG } from '@/i18n/constants'
 import { setupDiagramDownloadOverlay } from '@/lib/preview/diagram-download'
 import { useRenderStore } from '@/stores/render'
 import { useUIStore } from '@/stores/ui'
@@ -99,7 +100,13 @@ defineExpose({
             effectivePreviewWidth === 'w-[375px]' ? 'max-w-full' : '',
           ]"
         >
-          <section id="output" class="w-full" @click="onContentClick" v-html="output" />
+          <section
+            id="output"
+            class="w-full"
+            :lang="CONTENT_FONT_LANG"
+            @click="onContentClick"
+            v-html="output"
+          />
           <div v-if="isCoping" class="loading-mask">
             <div class="loading-mask-box">
               <div class="loading__img" />
@@ -244,7 +251,6 @@ defineExpose({
   opacity: 0.7;
 }
 
-/* Dark mode */
 .output_night .diagram-download-btn {
   background: rgba(30, 32, 38, 0.88);
   border-color: rgba(255, 255, 255, 0.1);

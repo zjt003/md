@@ -2,7 +2,9 @@ export default {
   locale: {
     label: `Language`,
     zhCN: `简体中文`,
+    zhTW: `繁體中文`,
     enUS: `English`,
+    jaJP: `日本語`,
   },
   meta: {
     title: `WeChat Markdown Editor | Doocs`,
@@ -22,6 +24,7 @@ export default {
     edit: `Edit`,
     delete: `Delete`,
     close: `Close`,
+    more: `More`,
     copy: `Copy`,
     reset: `Reset`,
     clear: `Clear`,

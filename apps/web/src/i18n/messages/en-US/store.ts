@@ -73,6 +73,7 @@ export default {
   },
   pdf: {
     pageFooter: `Page " counter(page) " of " counter(pages) "`,
+    pageFooterN: `" counter(page) "`,
   },
   relativeTime: {
     justNow: `Just now`,
@@ -90,6 +91,14 @@ export default {
     plantumlError: `Failed to load PlantUML diagram`,
     infographicLoading: `Loading infographic…`,
     infographicError: `Infographic render failed: {detail}`,
+  },
+  count: {
+    summary: `{words} words, about {minutes} min read`,
+  },
+  render: {
+    footnoteTitle: `References`,
+    unknownComponent: `Unknown component: {name}`,
+    katexLoading: `Loading formula…`,
   },
   popup: {
     mustRead: `Before you start`,

@@ -2,13 +2,23 @@ import type { S3ClientConfig } from '@aws-sdk/client-s3'
 import fetch from '@md/shared/utils/fetch'
 import * as tokenTools from '@md/shared/utils/tokenTools'
 import { base64encode, safe64, utf16to8 } from '@md/shared/utils/tokenTools'
-import Buffer from 'buffer-from'
-import CryptoJS from 'crypto-js'
-import { v4 as uuidv4 } from 'uuid'
 import { t } from '@/i18n/translate'
 import { uploadDefaultImage } from '@/services/upload/client'
 import { store } from '@/storage'
 import { loadS3Sdk } from './s3-sdk'
+
+type CryptoJSModule = typeof import('crypto-js')
+
+let cryptoJsPromise: Promise<CryptoJSModule> | null = null
+
+function loadCryptoJS() {
+  cryptoJsPromise ??= import(`crypto-js`)
+  return cryptoJsPromise
+}
+
+function uuidv4() {
+  return crypto.randomUUID()
+}
 
 /**
  * Safely parse JSON string, returns parsed result or throws a descriptive error
@@ -42,10 +52,7 @@ async function getConfig(platform: string) {
   }
 }
 
-/**
- * 获取 `年/月/日` 形式的目录
- * @returns string
- */
+/** Directory path as YYYY/MM/DD. */
 function getDir() {
   const date = new Date()
   const year = date.getFullYear()
@@ -54,14 +61,9 @@ function getDir() {
   return `${year}/${month}/${day}`
 }
 
-/**
- * 根据文件名获取它以 `时间戳+uuid` 的形式
- * @param {string} filename 文件名
- * @returns {string} `时间戳+uuid`
- */
+/** Filename as timestamp-uuid with the original extension. */
 function getDateFilename(filename: string) {
   const currentTimestamp = Date.now()
-  // 获取最后一个点号后的内容作为文件扩展名
   const fileSuffix = filename.split(`.`).pop()
   return `${currentTimestamp}-${uuidv4()}.${fileSuffix}`
 }
@@ -115,10 +117,11 @@ async function ghFileUpload(content: string, filename: string) {
 // Qiniu File Upload
 // -----------------------------------------------------------------------
 
-function getQiniuToken(accessKey: string, secretKey: string, putPolicy: {
+async function getQiniuToken(accessKey: string, secretKey: string, putPolicy: {
   scope: string
   deadline: number
 }) {
+  const CryptoJS = await loadCryptoJS()
   const policy = JSON.stringify(putPolicy)
   const encoded = base64encode(utf16to8(policy))
   const hash = CryptoJS.HmacSHA1(encoded, secretKey)
@@ -134,7 +137,7 @@ async function qiniuUpload(file: File) {
   const qiniu = await loadQiniu()
   const configStr = await store.get(`qiniuConfig`)
   const { accessKey, secretKey, bucket, region, path, domain } = safeJsonParse<{ accessKey: string, secretKey: string, bucket: string, region?: string, path: string, domain: string }>(configStr, `qiniu config`)
-  const token = getQiniuToken(accessKey, secretKey, {
+  const token = await getQiniuToken(accessKey, secretKey, {
     scope: bucket,
     deadline: Math.trunc(Date.now() / 1000) + 3600,
   })
@@ -449,13 +452,12 @@ async function getMpToken(appID: string, appsecret: string, proxyOrigin?: string
   }
   return ``
 }
-// Cloudflare Workers 环境
 const isCfWorkers = import.meta.env.CF_WORKERS === `1`
 
 async function mpFileUpload(file: File) {
   const configStr = await store.get(`mpConfig`)
   let { appID, appsecret, proxyOrigin } = safeJsonParse<{ appID: string, appsecret: string, proxyOrigin?: string }>(configStr, `mp config`)
-  // 未填写代理域名且是 Cloudflare Workers 环境时，使用当前域名作为代理域名
+  // When no proxy is configured on CF Workers, use the current origin
   if (!proxyOrigin && isCfWorkers) {
     proxyOrigin = window.location.origin
   }
@@ -538,6 +540,7 @@ async function upyunUpload(file: File) {
   const date = new Date().toUTCString()
   const method = `PUT`
   const signStr = [method, uri, date].join(`&`)
+  const CryptoJS = await loadCryptoJS()
   const passwordMd5 = CryptoJS.MD5(password).toString()
   const signature = CryptoJS.HmacSHA1(signStr, passwordMd5).toString(CryptoJS.enc.Base64)
   const authorization = `UPYUN ${operator}:${signature}`
@@ -585,7 +588,6 @@ async function telegramUpload(file: File): Promise<string> {
   if (!sendRes.ok || !sendRes.result.photo.length) {
     throw new Error(t(`upload.provider.telegramSendPhotoFailed`))
   }
-  // 取最大的分辨率那张图
   const fileId = sendRes.result.photo[sendRes.result.photo.length - 1].file_id
 
   // 2. getFile
@@ -601,7 +603,6 @@ async function telegramUpload(file: File): Promise<string> {
   }
 
   const filePath = fileRes.result.file_path
-  // 3. 拼出下载地址
   return `https://api.telegram.org/file/bot${token}/${filePath}`
 }
 
@@ -610,14 +611,14 @@ async function telegramUpload(file: File): Promise<string> {
 // -----------------------------------------------------------------------
 
 /**
- * cloudinaryConfig 配置示例：
+ * cloudinaryConfig example:
  * {
  *   "cloudName": "demo",
  *   "apiKey": "1234567890",
- *   "apiSecret": "abcdefg1234567890",     // 可选：若未填写则走 unsigned preset
- *   "uploadPreset": "unsigned_preset",     // 可选：有 apiSecret 时可省略
- *   "folder": "blog/image",                // 可选：Cloudinary 目录，留空则根路径
- *   "domain": "https://cdn.example.com"    // 可选：自定义访问域名 / CDN 域名
+ *   "apiSecret": "abcdefg1234567890",     // optional: omit for unsigned preset
+ *   "uploadPreset": "unsigned_preset",     // optional when apiSecret is set
+ *   "folder": "blog/image",                // optional Cloudinary folder
+ *   "domain": "https://cdn.example.com"    // optional custom CDN host
  * }
  */
 async function cloudinaryUpload(file: File): Promise<string> {
@@ -634,15 +635,14 @@ async function cloudinaryUpload(file: File): Promise<string> {
   if (!cloudName || !apiKey)
     throw new Error(t(`upload.provider.cloudinaryMissingConfig`))
 
-  const timestamp = Math.floor(Date.now() / 1000) // Cloudinary 要求秒级时间戳
+  const timestamp = Math.floor(Date.now() / 1000) // Cloudinary expects seconds
   const formData = new FormData()
   formData.append(`file`, file)
   formData.append(`api_key`, apiKey)
   formData.append(`timestamp`, `${timestamp}`)
 
-  // ---------- 1) 需要签名的场景 ----------
   if (apiSecret) {
-    // 参与签名的字段需按字典序排列并拼接成 a=b&c=d… 的格式
+    // Signed upload: sort params lexicographically as a=b&c=d…
     const params: string[] = []
     if (folder)
       params.push(`folder=${folder}`)
@@ -651,6 +651,7 @@ async function cloudinaryUpload(file: File): Promise<string> {
     params.push(`timestamp=${timestamp}`)
 
     const signatureBase = params.sort().join(`&`)
+    const CryptoJS = await loadCryptoJS()
     const signature = CryptoJS.SHA1(signatureBase + apiSecret).toString()
     formData.append(`signature`, signature)
   }
@@ -675,7 +676,6 @@ async function cloudinaryUpload(file: File): Promise<string> {
   if (!originUrl)
     throw new Error(t(`upload.provider.cloudinaryMissingUrl`))
 
-  // 如果配置了自定义域名，则把 host 换掉
   if (domain) {
     const { pathname, search } = new URL(originUrl)
     return `${domain}${pathname}${search}`
@@ -690,9 +690,11 @@ async function cloudinaryUpload(file: File): Promise<string> {
 
 async function formCustomUpload(content: string, file: File) {
   const customConfig = await store.get(`formCustomConfig`)
-  const [{ S3Client, PutObjectCommand, getSignedUrl }, qiniu] = await Promise.all([
+  const [{ S3Client, PutObjectCommand, getSignedUrl }, qiniu, CryptoJS, Buffer] = await Promise.all([
     loadS3Sdk(),
     loadQiniu(),
+    loadCryptoJS(),
+    import(`buffer-from`).then(m => m.default),
   ])
   const str = `
     async (CUSTOM_ARG) => {
@@ -701,27 +703,25 @@ async function formCustomUpload(content: string, file: File) {
   `
   return new Promise<string>((resolve, reject) => {
     const exportObj = {
-      content, // 待上传图片的 base64
-      file, // 待上传图片的 file 对象
+      content,
+      file,
       util: {
-        axios: fetch, // axios 实例
-        CryptoJS, // 加密库
-        // OSS, // OSS references removed
-        // COS, // COS references removed
-        Buffer, // buffer-from
-        uuidv4, // uuid
-        qiniu, // qiniu-js
-        tokenTools, // 一些编码转换函数
-        getDir, // 获取 年/月/日 形式的目录
-        getDateFilename, // 根据文件名获取它以 时间戳+uuid 的形式
+        axios: fetch,
+        CryptoJS,
+        Buffer,
+        uuidv4,
+        qiniu,
+        tokenTools,
+        getDir,
+        getDateFilename,
         S3: {
           S3Client,
           PutObjectCommand,
           getSignedUrl,
         },
       },
-      okCb: resolve, // 重要: 上传成功后给此回调传 url 即可
-      errCb: reject, // 上传失败调用的函数
+      okCb: resolve, // pass uploaded URL on success
+      errCb: reject,
     }
     // Use Function constructor instead of eval
     // eslint-disable-next-line no-new-func

@@ -73,6 +73,7 @@ export default {
   },
   pdf: {
     pageFooter: `第 " counter(page) " 页，共 " counter(pages) " 页`,
+    pageFooterN: `" counter(page) "`,
   },
   relativeTime: {
     justNow: `刚刚`,
@@ -90,6 +91,14 @@ export default {
     plantumlError: `PlantUML 图表加载失败`,
     infographicLoading: `正在加载 Infographic...`,
     infographicError: `Infographic 渲染失败: {detail}`,
+  },
+  count: {
+    summary: `字数 {words}，阅读大约需 {minutes} 分钟`,
+  },
+  render: {
+    footnoteTitle: `引用链接`,
+    unknownComponent: `未知组件: {name}`,
+    katexLoading: `正在加载公式…`,
   },
   popup: {
     mustRead: `使用必读`,

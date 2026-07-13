@@ -38,10 +38,11 @@ apps (web / vscode / mcp-server)
 ```
 Markdown 原文
   → @md/core (marked + 自定义扩展)
-  → juice 内联 CSS（微信兼容）
   → isomorphic-dompurify 净化
   → 注入主题 CSS 变量 (@md/core/theme)
-  → HTML 输出（预览 / 复制到公众号）
+  → HTML 输出（预览）
+  → juice 内联 CSS（仅复制到微信时，在 `@md/web` 导出层）
+  → 剪贴板 HTML（公众号）
 ```
 
 Web 端入口：
@@ -76,7 +77,7 @@ Pinia stores 按领域划分：
 - `useThemeStore` — 主题与样式（含 per-theme 配置持久化）
 - `useRenderStore` — 渲染结果与目录标题
 - `useUIStore` — 布局、对话框、视图模式
-- `useLocaleStore` — 界面语言（zh-CN / en-US），同步 `document.title` 与 i18n 实例
+- `useLocaleStore` — 界面语言（zh-CN / zh-TW / en-US / ja-JP），同步 `document.title` 与 i18n 实例
 - `useSyncStore` / `useAuthStore` — 云同步与账户
 - `useConfirmStore` — 全局确认对话框（`components/shared/confirm-dialog/`）
 

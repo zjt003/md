@@ -1,4 +1,3 @@
-import { v4 as uuidv4 } from 'uuid'
 import { ref, watch } from 'vue'
 import { t } from '@/i18n/translate'
 import { store } from '@/storage'
@@ -6,7 +5,7 @@ import { store } from '@/storage'
 export interface QuickCommandPersisted {
   id: string
   label: string
-  template: string // 用 {{sel}} 占位
+  template: string // use {{sel}} as selection placeholder
 }
 
 export interface QuickCommandRuntime extends QuickCommandPersisted {
@@ -15,7 +14,6 @@ export interface QuickCommandRuntime extends QuickCommandPersisted {
 
 const STORAGE_KEY = `quick_commands`
 
-// 把持久化的对象转换为可执行的 buildPrompt
 function hydrate(cmd: QuickCommandPersisted): QuickCommandRuntime {
   return {
     ...cmd,
@@ -66,7 +64,7 @@ export const useQuickCommandsStore = defineStore(`quickCommands`, () => {
 
   // ---------- CRUD ----------
   function add(label: string, template: string) {
-    const id = uuidv4()
+    const id = crypto.randomUUID()
     commands.value.push(hydrate({ id, label, template }))
   }
 

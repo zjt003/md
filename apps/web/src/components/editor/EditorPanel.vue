@@ -3,15 +3,17 @@ import { Compartment, EditorState, Prec } from '@codemirror/state'
 import { EditorView, keymap, placeholder } from '@codemirror/view'
 import { history, markdownSetup, replaceDocumentWithoutHistory, resetEditorHistory, theme } from '@md/shared/editor'
 import { toBase64 } from '@md/shared/utils/fileHelpers'
-import imageCompression from 'browser-image-compression'
 import { defineAsyncComponent } from 'vue'
 import SlashCommandMenu from '@/components/editor/SlashCommandMenu.vue'
 import { SearchTab } from '@/components/ui/search-tab'
+import { createComponentCompletionExtension } from '@/composables/useComponentCompletion'
 import { useEditorRefresh } from '@/composables/useEditorRefresh'
 import { useImageUploader } from '@/composables/useImageUploader'
 import { completeInitialPreviewBoot } from '@/composables/useInitialPreviewBoot'
+import { useLocalizedAllComponents } from '@/composables/useLocalizedBuiltinComponents'
 import { useLocalizedUploadHostOptions } from '@/composables/useLocalizedUploadHosts'
 import { useSlashCommand } from '@/composables/useSlashCommand'
+import { CONTENT_FONT_LANG } from '@/i18n/constants'
 import { formatLocalDateTime } from '@/i18n/translate'
 import { jumpToAdjacentHeading } from '@/lib/markdown/headingNavigation'
 import { contentHasMath, loadMathJax, MATHJAX_READY_EVENT } from '@/lib/preview/mathjax'
@@ -33,8 +35,9 @@ const postStore = usePostStore()
 const renderStore = useRenderStore()
 const themeStore = useThemeStore()
 const uiStore = useUIStore()
+const localizedAllComponents = useLocalizedAllComponents()
 const { upload } = useImageUploader()
-const { editorRefresh } = useEditorRefresh()
+const { editorRefresh, scheduleEditorRefresh } = useEditorRefresh()
 
 const {
   visible: slashVisible,
@@ -79,7 +82,7 @@ const historyCompartment = new Compartment()
 function editorPlaceholder() {
   return placeholder(t(`codemirror.contentPlaceholder`))
 }
-const changeTimer = ref<ReturnType<typeof setTimeout>>()
+const persistTimer = ref<ReturnType<typeof setTimeout>>()
 
 const editorRef = useTemplateRef<HTMLDivElement>(`editorRef`)
 const codeMirrorWrapper = useTemplateRef<HTMLDivElement>(`codeMirrorWrapper`)
@@ -201,6 +204,7 @@ function uploaded(imageUrl: string) {
 }
 
 async function compressImage(file: File) {
+  const { default: imageCompression } = await import(`browser-image-compression`)
   const options = {
     maxSizeMB: 1,
     maxWidthOrHeight: 1920,
@@ -355,7 +359,6 @@ function mdLocalToRemote() {
 // --- Image paste handler for CodeMirror ---
 function createPasteHandler() {
   return (event: ClipboardEvent, view: EditorView) => {
-    // 1. 处理剪贴板中的文件 (截图/复制文件)
     if (event.clipboardData?.items && [...event.clipboardData.items].some(item => item.kind === 'file')) {
       if (isImgLoading.value) {
         return true
@@ -378,7 +381,6 @@ function createPasteHandler() {
       return true
     }
 
-    // 2. 处理剪贴板中的文本 (检测 Markdown 图片链接)
     const text = event.clipboardData?.getData('text/plain')
     if (text) {
       const mdImgRegex = /!\[(.*?)\]\((https?:\/\/[^)]+)\)/g
@@ -469,9 +471,9 @@ function createFormTextArea(dom: HTMLDivElement) {
       themeCompartment.of(theme(isDark.value)),
       EditorView.updateListener.of((update) => {
         if (update.docChanged) {
-          clearTimeout(changeTimer.value)
-          changeTimer.value = setTimeout(() => {
-            editorRefresh()
+          scheduleEditorRefresh()
+          clearTimeout(persistTimer.value)
+          persistTimer.value = setTimeout(() => {
             commitEditorContentToPost()
           }, 300)
         }
@@ -480,6 +482,7 @@ function createFormTextArea(dom: HTMLDivElement) {
         paste: createPasteHandler(),
       }),
       ...createSlashExtension(() => codeMirrorView.value),
+      ...createComponentCompletionExtension(() => localizedAllComponents.value),
     ],
   })
 
@@ -512,8 +515,8 @@ async function preloadMathJaxIfNeeded(content: string) {
 let postSwitchGeneration = 0
 
 function flushEditorContentToPostAtIndex(index: number) {
-  clearTimeout(changeTimer.value)
-  changeTimer.value = undefined
+  clearTimeout(persistTimer.value)
+  persistTimer.value = undefined
   if (!codeMirrorView.value || index < 0)
     return
 
@@ -577,6 +580,7 @@ watch(locale, () => {
   codeMirrorView.value.dispatch({
     effects: placeholderCompartment.reconfigure(editorPlaceholder()),
   })
+  editorRefresh()
 })
 
 function syncEditorToPostContent(content: string) {
@@ -608,7 +612,7 @@ watch(currentPostIndex, (newIndex, oldIndex) => {
   syncEditorToPostContent(post.content)
 })
 
-/** 云端同步等外部写入 posts 时，当前文章 index 不变也需刷新编辑器 */
+/** Refresh editor when posts change externally (e.g. cloud sync) even if index is unchanged */
 watch(
   () => currentPost.value?.content,
   (content) => {
@@ -618,7 +622,6 @@ watch(
   },
 )
 
-// 历史记录的定时器
 const historyTimer = ref<ReturnType<typeof setTimeout>>()
 onMounted(() => {
   historyTimer.value = setInterval(() => {
@@ -643,7 +646,7 @@ onUnmounted(() => {
   editorStore.unregisterContentFlush()
   window.removeEventListener(MATHJAX_READY_EVENT, handleMathJaxReady)
   clearTimeout(historyTimer.value)
-  clearTimeout(changeTimer.value)
+  clearTimeout(persistTimer.value)
   document.removeEventListener(`keydown`, handleGlobalKeydown, { capture: false })
 })
 
@@ -687,6 +690,7 @@ defineExpose({
         id="editor"
         ref="editorRef"
         class="codemirror-container mathjax-ignore"
+        :lang="CONTENT_FONT_LANG"
       />
     </EditorContextMenu>
   </div>

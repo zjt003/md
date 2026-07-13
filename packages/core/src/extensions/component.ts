@@ -2,9 +2,7 @@ import type { ComponentRegistry, CustomComponentDef } from '@md/shared/types'
 import type { MarkedExtension } from 'marked'
 import { escapeHtml, unescapeHtml } from '../utils/basicHelpers'
 
-// ────────────────────────────────────────────────────────────────────────────
-// 内置组件定义
-// ────────────────────────────────────────────────────────────────────────────
+// Built-in components
 
 export const BUILT_IN_COMPONENTS: CustomComponentDef[] = [
   {
@@ -73,7 +71,7 @@ export const BUILT_IN_COMPONENTS: CustomComponentDef[] = [
     description: `提示框组件，高亮展示小贴士或注意事项`,
     builtIn: true,
     props: [
-      { name: `type`, description: `类型：info | success | warning | danger`, default: `info` },
+      { name: `type`, description: `类型：info、success、warning、danger`, default: `info` },
       { name: `title`, description: `标题（可选）` },
       { name: `content`, description: `提示内容`, required: true },
     ],
@@ -95,7 +93,7 @@ export const BUILT_IN_COMPONENTS: CustomComponentDef[] = [
       { name: `caption`, description: `表格标题（可选）` },
     ],
     template: ``,
-    example: `<TableBlock headers='["名称","版本","状态"]' rows='[["Vue","3.x","✅ 稳定"],["Vite","8.x","✅ 稳定"],["pnpm","10.x","✅ 稳定"]]' caption="技术栈清单" />`,
+    example: `<TableBlock headers='["名称","版本","状态"]' rows='[["Vue","3.x","稳定"],["Vite","8.x","稳定"],["pnpm","10.x","稳定"]]' caption="技术栈清单" />`,
   },
   {
     id: `builtin-info-grid`,
@@ -125,29 +123,21 @@ export const BUILT_IN_COMPONENTS: CustomComponentDef[] = [
   },
 ]
 
-// ────────────────────────────────────────────────────────────────────────────
-// 属性解析
-// ────────────────────────────────────────────────────────────────────────────
+// Prop parsing
 
-/** 将 prop 字符串解析为 key->value 映射 */
+/** Parse prop string into key→value map */
 function parseProps(propsStr: string): Record<string, string> {
   const result: Record<string, string> = {}
-  // 支持 key="value" 和 key='value'
+  // key="value" and key='value'
   for (const m of propsStr.matchAll(/(\w[\w-]*)=(?:"([^"]*)"|'([^']*)')/g)) {
     result[m[1]] = unescapeHtml(m[2] !== undefined ? m[2] : (m[3] ?? ``))
   }
   return result
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// 特殊渲染器（内置组件专用，处理 JSON 数组等复杂逻辑）
-// ────────────────────────────────────────────────────────────────────────────
+// CSS variables & palette (light fallbacks; dark overridden via injected vars)
 
-// ────────────────────────────────────────────────────────────────────────────
-// CSS 变量与调色板（light 模式回退值，深色通过外部注入覆盖）
-// ────────────────────────────────────────────────────────────────────────────
-
-/** CSS 变量名→light 回退值的简写，注入为模板变量（下划线前缀防止与用户 prop 冲突） */
+/** Palette shorthand → light fallback, injected as template vars (_ prefix avoids prop clash) */
 function injectPaletteVars(props: Record<string, string>): Record<string, string> {
   return {
     _bgPrimary_: `var(--md-comp-bg, #fff)`,
@@ -162,7 +152,7 @@ function injectPaletteVars(props: Record<string, string>): Record<string, string
   }
 }
 
-/** CSS 变量简写对象，供特殊渲染器直接内联 */
+/** Palette shorthand for special renderers */
 const CV = {
   bg: `var(--md-comp-bg, #fff)`,
   bgSec: `var(--md-comp-bg-secondary, #f5f5f5)`,
@@ -174,9 +164,7 @@ const CV = {
   borderL: `var(--md-comp-border-light, #eee)`,
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// 特殊渲染器（内置组件专用，处理 JSON 数组等复杂逻辑）
-// ────────────────────────────────────────────────────────────────────────────
+// Special renderers (JSON arrays etc.)
 
 function renderTableBlock(props: Record<string, string>): string {
   let headers: string[] = []
@@ -249,15 +237,12 @@ function renderInfoGrid(props: Record<string, string>): string {
   return html
 }
 
-/** 特殊渲染器注册表 */
 const SPECIAL_RENDERERS: Record<string, (props: Record<string, string>) => string> = {
   TableBlock: renderTableBlock,
   InfoGrid: renderInfoGrid,
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// TipBlock 类型颜色映射
-// ────────────────────────────────────────────────────────────────────────────
+// TipBlock type colors
 
 const TIP_COLORS: Record<string, { borderColor: string, bgColor: string, textColor: string }> = {
   info: { borderColor: `#1890ff`, bgColor: `#e6f7ff`, textColor: `#0050b3` },
@@ -272,20 +257,13 @@ function injectTipColors(props: Record<string, string>): Record<string, string> 
   return { ...colors, ...props }
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// 模板渲染引擎
-// ────────────────────────────────────────────────────────────────────────────
+// Template engine
 
 /**
- * 递归处理模板字符串，支持：
- *   - `{{#each arrayProp}}...{{item}}...{{item.key}}...{{@index}}...{{/each}}`
- *   - `{{#if prop}}...{{#else}}...{{/if}}`
- *   - `{{#unless prop}}...{{/unless}}`
- *   - `{{propName}}` 基础替换（自动 HTML 转义）
- *   - `{{children}}` 保留原始 HTML 不转义
+ * Recursive template: {{#each}}, {{#if}}/{{#else}}, {{#unless}}, {{prop}} (escaped), {{children}} (raw HTML)
  */
 function processTemplate(html: string, props: Record<string, string>): string {
-  // 1. {{#each}} 循环（非贪婪；循环体内部通过递归支持嵌套的 #if/#unless，但不支持 #each 嵌套）
+  // {{#each}} — non-greedy; nested #if/#unless OK, not nested #each
   html = html.replace(/\{\{#each\s+([\w-]+)\}\}([\s\S]*?)\{\{\/each\}\}/g, (_, propKey, body) => {
     let items: unknown[]
     try { items = JSON.parse(props[propKey] || `[]`) }
@@ -305,12 +283,10 @@ function processTemplate(html: string, props: Record<string, string>): string {
       else {
         itemBody = itemBody.replace(/\{\{item\}\}/g, escapeHtml(String(item ?? ``)))
       }
-      // 递归处理循环体内的 #if/#unless/prop 替换
       return processTemplate(itemBody, props)
     }).join(``)
   })
 
-  // 2. {{#if prop}}...{{#else}}...{{/if}}
   html = html.replace(/\{\{#if\s+([\w-]+)\}\}([\s\S]*?)\{\{\/if\}\}/g, (_, key, content) => {
     const elseIdx = content.indexOf(`{{#else}}`)
     if (elseIdx >= 0) {
@@ -319,12 +295,10 @@ function processTemplate(html: string, props: Record<string, string>): string {
     return props[key] ? content : ``
   })
 
-  // 3. {{#unless prop}}...{{/unless}}
   html = html.replace(/\{\{#unless\s+([\w-]+)\}\}([\s\S]*?)\{\{\/unless\}\}/g, (_, key, content) => {
     return !props[key] ? content : ``
   })
 
-  // 4. {{propName}} 替换；{{children}} 不转义
   html = html.replace(/\{\{([\w-]+)\}\}/g, (_, key) => {
     if (key === `children`)
       return props[key] ?? ``
@@ -334,13 +308,8 @@ function processTemplate(html: string, props: Record<string, string>): string {
   return html
 }
 
-/**
- * 将组件定义和 props 渲染为 HTML 字符串。
- * 优先使用 SPECIAL_RENDERERS，否则走 processTemplate 模板引擎。
- * 颜色通过 CSS 自定义属性适配暗色模式，回退值为 light 模式颜色。
- */
+/** Render component def + props to HTML (SPECIAL_RENDERERS or template; CSS vars for dark mode). */
 function renderTemplate(def: CustomComponentDef, rawProps: Record<string, string>): string {
-  // 1. 合并默认值
   const props: Record<string, string> = {}
   for (const propDef of def.props) {
     if (propDef.default !== undefined) {
@@ -349,13 +318,11 @@ function renderTemplate(def: CustomComponentDef, rawProps: Record<string, string
   }
   Object.assign(props, rawProps)
 
-  // 2. 特殊渲染器（TableBlock / InfoGrid）
   const specialRenderer = SPECIAL_RENDERERS[def.name]
   if (specialRenderer) {
     return specialRenderer(props)
   }
 
-  // 3. 注入调色板变量 + TipBlock 颜色
   const propsWithPalette = injectPaletteVars(
     def.name === `TipBlock` ? injectTipColors(props) : props,
   )
@@ -363,9 +330,7 @@ function renderTemplate(def: CustomComponentDef, rawProps: Record<string, string
   return processTemplate(def.template, propsWithPalette)
 }
 
-/**
- * 预览组件渲染结果（供编辑器 UI 实时预览使用）
- */
+/** Preview component HTML for editor UI */
 export function previewComponent(
   def: CustomComponentDef,
   propsOverride?: Record<string, string>,
@@ -373,18 +338,14 @@ export function previewComponent(
   return renderTemplate(def, propsOverride ?? {})
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// 可变注册表（通过 setComponentRegistry 在渲染时更新）
-// ────────────────────────────────────────────────────────────────────────────
+// Mutable registry (updated at render time via setComponentRegistry)
 
 let _registry: ComponentRegistry = {}
 
-/** 更新当前渲染使用的组件注册表 */
 export function setComponentRegistry(registry: ComponentRegistry): void {
   _registry = registry
 }
 
-/** 获取内置组件注册表 */
 export function getBuiltInRegistry(): ComponentRegistry {
   const reg: ComponentRegistry = {}
   for (const c of BUILT_IN_COMPONENTS) {
@@ -393,22 +354,24 @@ export function getBuiltInRegistry(): ComponentRegistry {
   return reg
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Marked 扩展
-// ────────────────────────────────────────────────────────────────────────────
-
 /**
- * marked 扩展：解析 JSX 风格的自定义组件语法
- *
- * 支持：
- *   自闭合：  <ComponentName prop="value" />
- *   开闭合：  <ComponentName prop="value">children</ComponentName>
- *
- * 组件名必须以大写字母开头（PascalCase）以与普通 HTML 标签区分。
+ * marked extension: JSX-style custom components (PascalCase names).
+ * Self-closing: <Component prop="value" />
+ * With children: <Component prop="value">children</Component>
  */
-export function markedComponent(getRegistry?: () => ComponentRegistry): MarkedExtension {
+const DEFAULT_UNKNOWN_COMPONENT = `Unknown component: {name}`
+
+export function markedComponent(
+  getRegistry?: () => ComponentRegistry,
+  getRenderMessages?: () => { unknownComponent?: string } | undefined,
+): MarkedExtension {
   function resolveRegistry(): ComponentRegistry {
     return getRegistry ? getRegistry() : _registry
+  }
+
+  function formatUnknownComponent(name: string): string {
+    const template = getRenderMessages?.()?.unknownComponent || DEFAULT_UNKNOWN_COMPONENT
+    return template.split(`{name}`).join(name)
   }
 
   function findLineEnd(src: string, from: number): number {
@@ -448,13 +411,8 @@ export function markedComponent(getRegistry?: () => ComponentRegistry): MarkedEx
     return undefined
   }
 
-  /**
-   * 简单的非正则标签解析器，避免复杂 regex 的回溯问题。
-   * 返回 raw（完整原始文本）、name（组件名）、propsStr（属性串）。
-   */
+  /** Non-regex tag parser (avoids catastrophic backtracking). Returns raw, name, propsStr. */
   function parseTag(src: string) {
-    // 必须以 <UppercaseLetter 开头
-
     function findClosingTag(src: string, name: string, from: number): number {
       const closeTag = `</${name}>`
       let lineStart = from
@@ -496,14 +454,13 @@ export function markedComponent(getRegistry?: () => ComponentRegistry): MarkedEx
     if (src[0] !== `<` || src[1] < `A` || src[1] > `Z`)
       return null
 
-    // 提取组件名
     let i = 1
     while (i < src.length && /\w/.test(src[i])) i++
     const name = src.slice(1, i)
     if (!name)
       return null
 
-    // 扫描开始标签内容，正确处理引号内的 > 字符
+    // Scan open tag; respect > inside quoted attribute values
     let inQuote = ``
     let j = i
     while (j < src.length) {
@@ -516,7 +473,6 @@ export function markedComponent(getRegistry?: () => ComponentRegistry): MarkedEx
         inQuote = ch
       }
       else if (ch === `/` && src[j + 1] === `>`) {
-        // 自闭合标签结束
         if (!hasOnlyWhitespaceToLineEnd(src, j + 2))
           return null
         return { raw: src.slice(0, j + 2), name, propsStr: src.slice(i, j).trim(), children: `` }
@@ -525,7 +481,7 @@ export function markedComponent(getRegistry?: () => ComponentRegistry): MarkedEx
         const lineEnd = findLineEnd(src, j + 1)
         const closeTag = `</${name}>`
 
-        // 支持同一行内自洽的开闭合标签，但不接受标签后混入其他 Markdown 语法。
+        // Same-line open/close OK; nothing else on the line after close tag
         const inlineCloseIdx = src.indexOf(closeTag, j + 1)
         if (inlineCloseIdx >= 0 && inlineCloseIdx < lineEnd) {
           if (src.slice(inlineCloseIdx + closeTag.length, lineEnd).trim() !== ``)
@@ -538,7 +494,7 @@ export function markedComponent(getRegistry?: () => ComponentRegistry): MarkedEx
         if (!hasOnlyWhitespaceToLineEnd(src, j + 1))
           return null
 
-        // 多行组件要求关闭标签位于独立行，且跳过 fenced code 中的同名文本。
+        // Multiline: close tag on its own line; skip matches inside fenced code
         const closeIdx = findClosingTag(src, name, lineEnd === src.length ? lineEnd : lineEnd + 1)
         if (closeIdx < 0)
           return null
@@ -577,11 +533,10 @@ export function markedComponent(getRegistry?: () => ComponentRegistry): MarkedEx
           const { name, propsStr, children } = token as unknown as { name: string, propsStr: string, children: string }
           const def = resolveRegistry()[name]
           if (!def) {
-            // 未知组件，保留原始文本并给出提示
-            return `<p style="color:#f00;font-size:12px;">[未知组件: ${name}]</p>\n`
+            return `<p style="color:#f00;font-size:12px;">[${formatUnknownComponent(name)}]</p>\n`
           }
           const props = parseProps(propsStr)
-          // 将内部子内容作为保留的 children prop 传入（原始 HTML，不转义）
+          // Pass inner HTML as children prop (unescaped)
           if (children && props.children === undefined) {
             props.children = children
           }

@@ -15,7 +15,11 @@ import { ensureMathJaxLoaded, isMathJaxReady } from '../utils/mathjax'
 
 export interface MarkedKatexOptions {
   nonStandard?: boolean
+  /** Locale-aware loading placeholder; falls back to English */
+  getKatexLoadingMessage?: () => string | undefined
 }
+
+const DEFAULT_KATEX_LOADING = `Loading formula…`
 
 let mathJaxLoadRequested = false
 
@@ -33,7 +37,11 @@ function requestMathJaxLoad() {
     })
 }
 
-function createRenderer(defaultDisplay: boolean, withStyle: boolean = true): KatexRenderFn {
+function createRenderer(
+  defaultDisplay: boolean,
+  withStyle: boolean = true,
+  getKatexLoadingMessage?: () => string | undefined,
+): KatexRenderFn {
   return (token: KatexToken) => {
     const display = token.displayMode ?? defaultDisplay
     const rawAttr = escapeHtml(token.raw ?? token.text)
@@ -42,7 +50,8 @@ function createRenderer(defaultDisplay: boolean, withStyle: boolean = true): Kat
       requestMathJaxLoad()
 
       if (display) {
-        return `<section class="katex-block katex-pending" data-math-display="true" data-math-raw="${rawAttr}"><span>正在加载公式…</span></section>`
+        const loading = getKatexLoadingMessage?.() || DEFAULT_KATEX_LOADING
+        return `<section class="katex-block katex-pending" data-math-display="true" data-math-raw="${rawAttr}"><span>${escapeHtml(loading)}</span></section>`
       }
 
       return `<span class="katex-inline katex-pending" data-math-display="false" data-math-raw="${rawAttr}"><span>…</span></span>`
@@ -54,8 +63,8 @@ function createRenderer(defaultDisplay: boolean, withStyle: boolean = true): Kat
     const width = svg.style[`min-width`] || svg.getAttribute(`width`)
     svg.removeAttribute(`width`)
 
-    // 行内公式对齐 https://groups.google.com/g/mathjax-users/c/zThKffrrCvE?pli=1
-    // 直接覆盖 style 会覆盖 MathJax 的样式，需要逐个属性设置
+    // Inline math vertical align: https://groups.google.com/g/mathjax-users/c/zThKffrrCvE?pli=1
+    // Set properties individually; assigning style overwrites MathJax defaults
 
     if (withStyle) {
       svg.style.display = `initial`
@@ -64,8 +73,16 @@ function createRenderer(defaultDisplay: boolean, withStyle: boolean = true): Kat
       svg.style.width = width || ``
     }
 
+    const firstG = svg.querySelector(`g`)
+    if (firstG) {
+      // Inline style + attributes: WeChat reader dark mode follows currentColor with text
+      firstG.style.fill = `currentColor`
+      firstG.style.stroke = `currentColor`
+      firstG.setAttribute(`fill`, `currentColor`)
+      firstG.setAttribute(`stroke`, `currentColor`)
+    }
+
     if (!display) {
-      // 新主题系统：使用 class 而非内联样式
       return `<span class="katex-inline" data-math-display="false" data-math-raw="${escapeHtml(token.raw ?? token.text)}">${svg.outerHTML}</span>`
     }
 
@@ -167,12 +184,13 @@ function blockLatexKatex(_options: MarkedKatexOptions | undefined, renderer: Kat
 }
 
 export function MDKatex(options: MarkedKatexOptions | undefined, withStyle: boolean = true): MarkedExtension {
+  const getLoading = options?.getKatexLoadingMessage
   return {
     extensions: [
-      inlineKatex(options, createRenderer(false, withStyle)),
-      blockKatex(options, createRenderer(true, withStyle)),
-      inlineLatexKatex(options, createRenderer(false, withStyle)),
-      blockLatexKatex(options, createRenderer(true, withStyle)),
+      inlineKatex(options, createRenderer(false, withStyle, getLoading)),
+      blockKatex(options, createRenderer(true, withStyle, getLoading)),
+      inlineLatexKatex(options, createRenderer(false, withStyle, getLoading)),
+      blockLatexKatex(options, createRenderer(true, withStyle, getLoading)),
     ],
   }
 }

@@ -1,15 +1,18 @@
 <script setup lang="ts">
-import type { ComponentPropDef, ComponentPropType, CustomComponentDef } from '@md/shared'
+import type { ComponentPropDef, CustomComponentDef } from '@md/shared'
+import type { CustomComponentFormPayload } from './CustomComponentForm.vue'
 import type { MpAccount } from '@/stores/mpAccounts'
 import { Blocks, Check, ChevronDown, Copy, Download, Lock, Pencil, Plus, Rss, Trash2, Upload, Zap } from '@lucide/vue'
-import { escapeHtml, previewComponent } from '@md/core'
-import DOMPurify from 'isomorphic-dompurify'
+import { escapeHtml } from '@md/core'
 import { useLocalizedBuiltinComponents } from '@/composables/useLocalizedBuiltinComponents'
+import { buildComponentSnippet, missingRequiredProps } from '@/lib/component-snippet'
 import { useConfirmStore } from '@/stores/confirm'
 import { useCustomComponentStore } from '@/stores/customComponent'
 import { useEditorStore } from '@/stores/editor'
 import { useMpAccountsStore } from '@/stores/mpAccounts'
 import { useUIStore } from '@/stores/ui'
+import ComponentPropFill from './ComponentPropFill.vue'
+import CustomComponentForm from './CustomComponentForm.vue'
 
 const { t } = useI18n()
 const confirmStore = useConfirmStore()
@@ -21,189 +24,39 @@ const uiStore = useUIStore()
 
 const { toggleShowComponentDialog } = uiStore
 
-// ──────────────────────────────────────────────
-// 表单状态
-// ──────────────────────────────────────────────
 const isShowForm = ref(false)
 const formMode = ref<'create' | 'edit'>('create')
 const editingId = ref('')
+const editingDef = ref<CustomComponentDef | null>(null)
 
-interface PropRow {
-  name: string
-  description: string
-  default: string
-  required: boolean
-  type: ComponentPropType
-}
-
-const formData = reactive({
-  name: '',
-  description: '',
-  template: '',
-})
-
-const propRows = ref<PropRow[]>([])
-
-const formErrors = reactive({
-  name: '',
-  template: '',
-})
-
-// ──────────────────────────────────────────────
-// 表单操作
-// ──────────────────────────────────────────────
 function openCreateForm() {
   formMode.value = 'create'
   editingId.value = ''
-  formData.name = ''
-  formData.description = ''
-  formData.template = ''
-  propRows.value = []
-  formErrors.name = ''
-  formErrors.template = ''
+  editingDef.value = null
   isShowForm.value = true
 }
 
 function openEditForm(def: CustomComponentDef) {
   formMode.value = 'edit'
   editingId.value = def.id
-  formData.name = def.name
-  formData.description = def.description || ''
-  formData.template = def.template
-  propRows.value = def.props.length
-    ? def.props.map(p => ({
-        name: p.name,
-        description: p.description || '',
-        default: p.default || '',
-        required: !!p.required,
-        type: (p.type || 'string') as ComponentPropType,
-      }))
-    : []
-  formErrors.name = ''
-  formErrors.template = ''
+  editingDef.value = def
   isShowForm.value = true
 }
 
-function addPropRow() {
-  propRows.value.push({ name: '', description: '', default: '', required: false, type: 'string' })
-}
-
-function removePropRow(idx: number) {
-  if (idx < 0 || idx >= propRows.value.length)
-    return
-  propRows.value.splice(idx, 1)
-}
-
-function validate(): boolean {
-  formErrors.name = ''
-  formErrors.template = ''
-  const name = formData.name.trim()
-
-  if (!name) {
-    formErrors.name = t('component.nameRequired')
-    return false
-  }
-  if (!/^[A-Z][a-zA-Z0-9]*$/.test(name)) {
-    formErrors.name = t('component.nameInvalid')
-    return false
-  }
-  const duplicate = componentStore.userComponents.find(c => c.name === name && (formMode.value === 'create' || c.id !== editingId.value))
-  if (duplicate) {
-    formErrors.name = t('component.nameDuplicate')
-    return false
-  }
-  if (!formData.template.trim()) {
-    formErrors.template = t('component.templateRequired')
-    return false
-  }
-  return true
-}
-
-function buildProps(): ComponentPropDef[] {
-  return propRows.value
-    .filter(r => r.name.trim())
-    .map(r => ({
-      name: r.name.trim(),
-      description: r.description.trim() || undefined,
-      default: r.default || undefined,
-      required: r.required || undefined,
-      type: r.type !== 'string' ? r.type : undefined,
-    }))
-}
-
-function saveComponent() {
-  if (!validate())
-    return
-
-  const props = buildProps()
-
+function onFormSave(payload: CustomComponentFormPayload) {
   if (formMode.value === 'create') {
-    componentStore.createComponent({
-      name: formData.name.trim(),
-      description: formData.description.trim() || undefined,
-      template: formData.template,
-      props,
-    })
+    componentStore.createComponent(payload)
   }
   else {
-    componentStore.updateComponent(editingId.value, {
-      name: formData.name.trim(),
-      description: formData.description.trim() || undefined,
-      template: formData.template,
-      props,
-    })
+    componentStore.updateComponent(editingId.value, payload)
   }
   isShowForm.value = false
 }
 
-function cancelForm() {
+function onFormCancel() {
   isShowForm.value = false
 }
 
-const TEMPLATE_PLACEHOLDER = `<section style="text-align:center;">
-  <img src="https://api.qrserver.com/v1/create-qr-code/?data={{url}}" />
-  <p>{{text}}</p>
-</section>`
-
-// ──────────────────────────────────────────────
-// 实时预览
-// ──────────────────────────────────────────────
-const isShowPreview = ref(false)
-
-const previewHtml = computed(() => {
-  if (!formData.template.trim())
-    return ''
-  const props = buildProps()
-  const tmpDef: CustomComponentDef = {
-    id: '__preview__',
-    name: formData.name.trim() || 'Preview',
-    template: formData.template,
-    props,
-  }
-  // 用每个 prop 的默认值（或占位）渲染预览
-  const propValues: Record<string, string> = {}
-  for (const p of props) {
-    if (p.default !== undefined && p.default !== '')
-      propValues[p.name] = p.default
-    else if (p.type === 'array')
-      propValues[p.name] = '[]'
-    else if (p.type === 'boolean')
-      propValues[p.name] = 'true'
-    else if (p.type === 'number')
-      propValues[p.name] = '0'
-  }
-  try {
-    const raw = previewComponent(tmpDef, propValues)
-    return DOMPurify.sanitize(raw, { ADD_TAGS: [`mp-common-profile`] })
-  }
-  catch {
-    return ''
-  }
-})
-
-// ──────────────────────────────────────────────
-// 导入 / 导出
-// ──────────────────────────────────────────────
 function exportComponents() {
   const data = JSON.stringify(componentStore.userComponents, null, 2)
   const blob = new Blob([data], { type: 'application/json' })
@@ -260,18 +113,49 @@ function onImportFile(event: Event) {
     catch {
       toast.error(t('component.importFailed'))
     }
-    // reset input so the same file can be re-imported
     if (importFileRef.value)
       importFileRef.value.value = ''
   }
   reader.readAsText(file)
 }
 
-// ──────────────────────────────────────────────
-// 列表操作
-// ──────────────────────────────────────────────
+const activeComponentTab = ref<'builtin' | 'custom'>('builtin')
+const expandedId = ref<string | null>(null)
+const fillValues = reactive<Record<string, Record<string, string>>>({})
+const copiedId = ref<string | null>(null)
+
+watch(activeComponentTab, () => {
+  expandedId.value = null
+})
+
+function toggleExpand(id: string) {
+  expandedId.value = expandedId.value === id ? null : id
+}
+
+function onFillValues(id: string, values: Record<string, string>) {
+  fillValues[id] = values
+}
+
+/** Use filled values only while that component panel is expanded. */
+function activeFillValues(def: CustomComponentDef): Record<string, string> | undefined {
+  if (expandedId.value !== def.id)
+    return undefined
+  return fillValues[def.id]
+}
+
 function insertSnippet(def: CustomComponentDef) {
-  const snippet = def.example || componentStore.buildSnippet(def.builtIn ? findBuiltinDef(def.id) ?? def : def)
+  // `def` is already localized for built-ins (from localizedBuiltinComponents)
+  const values = activeFillValues(def)
+  if (values) {
+    const missing = missingRequiredProps(def, values)
+    if (missing.length) {
+      toast.error(t('component.requiredEmpty', { props: missing.join(', ') }))
+      return
+    }
+  }
+  const snippet = values
+    ? buildComponentSnippet(def, values)
+    : (def.example || componentStore.buildSnippet(def))
   editorStore.insertAtCursor(snippet)
   toast.success(t('component.insertSuccess', { name: def.name }))
   toggleShowComponentDialog(false)
@@ -289,40 +173,22 @@ function onUpdate(val: boolean) {
   if (!val) {
     toggleShowComponentDialog(false)
     isShowForm.value = false
+    expandedId.value = null
   }
 }
 
-const PREVIEW_FALLBACK_HTML = computed(() => `<span style="color:#aaa;font-size:12px;">${t('component.noContent')}</span>`)
-
-function getPropDefaultPlaceholder(type: string): string {
-  return type === 'array' ? '["item1","item2"]' : t('component.defaultValue')
-}
-
-// ──────────────────────────────────────────────
-// 展开/折叠详情
-// ──────────────────────────────────────────────
-const activeComponentTab = ref<'builtin' | 'custom'>('builtin')
-const expandedId = ref<string | null>(null)
-
-watch(activeComponentTab, () => {
-  expandedId.value = null
-})
-
-function toggleExpand(id: string) {
-  expandedId.value = expandedId.value === id ? null : id
-}
-
-// ──────────────────────────────────────────────
-// 复制代码片段
-// ──────────────────────────────────────────────
-const copiedId = ref<string | null>(null)
-
-function findBuiltinDef(id: string) {
-  return componentStore.builtInComponents.find(c => c.id === id)
-}
-
 async function copySnippet(def: CustomComponentDef) {
-  const text = def.example || componentStore.buildSnippet(def.builtIn ? findBuiltinDef(def.id) ?? def : def)
+  const values = activeFillValues(def)
+  if (values) {
+    const missing = missingRequiredProps(def, values)
+    if (missing.length) {
+      toast.error(t('component.requiredEmpty', { props: missing.join(', ') }))
+      return
+    }
+  }
+  const text = values
+    ? buildComponentSnippet(def, values)
+    : (def.example || componentStore.buildSnippet(def))
   try {
     await navigator.clipboard.writeText(text)
     copiedId.value = def.id
@@ -333,7 +199,6 @@ async function copySnippet(def: CustomComponentDef) {
   }
 }
 
-// 类型颜色标签
 function propTypeBadge(prop: ComponentPropDef) {
   if (prop.required)
     return { label: t('component.required'), class: 'bg-red-50 text-red-600 border-red-200' }
@@ -342,9 +207,7 @@ function propTypeBadge(prop: ComponentPropDef) {
   return { label: t('component.optional'), class: 'bg-muted text-muted-foreground border-border' }
 }
 
-// ──────────────────────────────────────────────
-// MpProfile 公众号名片集成
-// ──────────────────────────────────────────────
+// MpProfile WeChat card integration
 const isShowMpAccountConfig = ref(false)
 const editingMpAccountId = ref<string | null>(null)
 
@@ -394,7 +257,6 @@ function deleteMpAccount(account: MpAccount) {
   })
 }
 
-// 当对话框打开且携带 target 时，自动展开对应的内置组件
 watch(() => uiStore.isShowComponentDialog, (val) => {
   if (val && uiStore.componentDialogTarget) {
     const target = uiStore.componentDialogTarget
@@ -426,174 +288,14 @@ watch(() => uiStore.isShowComponentDialog, (val) => {
       </DialogHeader>
 
       <div class="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-6">
-        <!-- ─── 新建/编辑表单 ─── -->
-        <div v-if="isShowForm" class="space-y-5 p-4 sm:p-5 border rounded-xl bg-muted/30">
-          <h3 class="text-sm font-semibold">
-            {{ formMode === 'create' ? t('component.create') : t('component.edit') }}
-          </h3>
+        <CustomComponentForm
+          v-if="isShowForm"
+          :mode="formMode"
+          :initial="editingDef"
+          @save="onFormSave"
+          @cancel="onFormCancel"
+        />
 
-          <!-- 组件名称 -->
-          <div class="space-y-1.5">
-            <Label for="comp-name">
-              {{ t('component.nameLabel') }}
-              <span class="text-red-500 ml-0.5">*</span>
-              <span class="text-muted-foreground text-xs font-normal ml-1">{{ t('component.nameHint') }}</span>
-            </Label>
-            <Input
-              id="comp-name"
-              v-model="formData.name"
-              :placeholder="t('component.namePlaceholder')"
-              :class="{ 'border-red-500': formErrors.name }"
-            />
-            <p v-if="formErrors.name" class="text-sm text-red-500">
-              {{ formErrors.name }}
-            </p>
-          </div>
-
-          <!-- 组件描述 -->
-          <div class="space-y-1.5">
-            <Label for="comp-desc">{{ t('component.descLabel') }}</Label>
-            <Input
-              id="comp-desc"
-              v-model="formData.description"
-              :placeholder="t('component.descPlaceholder')"
-            />
-          </div>
-
-          <!-- Props 定义 -->
-          <div class="space-y-2">
-            <div class="flex items-center justify-between">
-              <Label>{{ t('component.propsLabel') }}</Label>
-              <Button variant="outline" size="sm" @click="addPropRow">
-                <Plus class="size-3 mr-1" />
-                {{ t('component.addProp') }}
-              </Button>
-            </div>
-            <template v-if="propRows.length > 0">
-              <!-- 桌面端：网格表头 -->
-              <div class="hidden sm:grid grid-cols-13 gap-2 px-1">
-                <span class="col-span-3 text-xs text-muted-foreground">{{ t('component.propName') }}</span>
-                <span class="col-span-2 text-xs text-muted-foreground">{{ t('component.propType') }}</span>
-                <span class="col-span-4 text-xs text-muted-foreground">{{ t('component.propDesc') }}</span>
-                <span class="col-span-3 text-xs text-muted-foreground">{{ t('component.propDefault') }}</span>
-                <span class="col-span-1" />
-              </div>
-              <div class="space-y-2">
-                <div
-                  v-for="(row, idx) in propRows"
-                  :key="idx"
-                  class="flex flex-col sm:grid sm:grid-cols-13 gap-2 items-start sm:items-center p-3 sm:p-0 border sm:border-0 rounded-lg sm:rounded-none bg-muted/20 sm:bg-transparent"
-                >
-                  <div class="w-full sm:col-span-3 flex gap-1 items-center">
-                    <span class="text-xs text-muted-foreground sm:hidden w-12 shrink-0">{{ t('component.propName') }}</span>
-                    <Input v-model="row.name" placeholder="propName" class="h-8 text-sm flex-1" />
-                  </div>
-                  <div class="w-full sm:col-span-2 flex gap-1 items-center">
-                    <span class="text-xs text-muted-foreground sm:hidden w-12 shrink-0">{{ t('component.propType') }}</span>
-                    <select
-                      v-model="row.type"
-                      class="h-8 w-full rounded-md border bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                    >
-                      <option value="string">
-                        string
-                      </option>
-                      <option value="number">
-                        number
-                      </option>
-                      <option value="boolean">
-                        boolean
-                      </option>
-                      <option value="array">
-                        array
-                      </option>
-                    </select>
-                  </div>
-                  <div class="w-full sm:col-span-4 flex gap-1 items-center">
-                    <span class="text-xs text-muted-foreground sm:hidden w-12 shrink-0">{{ t('component.propDesc') }}</span>
-                    <Input v-model="row.description" :placeholder="t('component.propDesc')" class="h-8 text-sm flex-1" />
-                  </div>
-                  <div class="w-full sm:col-span-3 flex gap-1 items-center">
-                    <span class="text-xs text-muted-foreground sm:hidden w-12 shrink-0">{{ t('component.propDefault') }}</span>
-                    <Input
-                      v-model="row.default"
-                      :placeholder="getPropDefaultPlaceholder(row.type)"
-                      class="h-8 text-sm flex-1"
-                    />
-                  </div>
-                  <div class="flex items-center gap-2 sm:col-span-1 sm:justify-center">
-                    <label class="flex items-center gap-1 text-xs cursor-pointer select-none" :title="t('component.required')">
-                      <input v-model="row.required" type="checkbox" class="cursor-pointer">
-                    </label>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      class="size-7 text-muted-foreground hover:text-red-500"
-                      @click="removePropRow(idx)"
-                    >
-                      <Trash2 class="size-3.5" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </template>
-            <div v-else class="rounded-lg border border-dashed bg-muted/20 px-3 py-4 text-xs text-muted-foreground">
-              {{ t('component.noProps') }}
-            </div>
-            <p class="text-xs text-muted-foreground">
-              {{ t('component.propRefHint') }}
-            </p>
-          </div>
-
-          <!-- HTML 模板 -->
-          <div class="space-y-1.5">
-            <Label for="comp-template">
-              {{ t('component.htmlTemplate') }}
-              <span class="text-red-500 ml-0.5">*</span>
-            </Label>
-            <Textarea
-              id="comp-template"
-              v-model="formData.template"
-              :placeholder="TEMPLATE_PLACEHOLDER"
-              class="font-mono text-sm resize-none h-44"
-              :class="{ 'border-red-500': formErrors.template }"
-            />
-            <p v-if="formErrors.template" class="text-sm text-red-500">
-              {{ formErrors.template }}
-            </p>
-            <div class="text-xs text-muted-foreground space-y-0.5">
-              <p>{{ t('component.templateHint1') }}</p>
-              <p>{{ t('component.templateHint2') }}</p>
-              <p>{{ t('component.templateHint3') }}</p>
-              <p>{{ t('component.templateHint4') }}</p>
-            </div>
-          </div>
-
-          <!-- 实时预览 -->
-          <div v-if="formData.template.trim()" class="space-y-1.5">
-            <div class="flex items-center justify-between">
-              <Label class="text-muted-foreground">{{ t('component.previewLabel') }}</Label>
-              <Button variant="ghost" size="sm" class="h-6 px-2 text-xs" @click="isShowPreview = !isShowPreview">
-                {{ isShowPreview ? t('common.collapse') : t('common.expand') }}
-              </Button>
-            </div>
-            <div
-              v-if="isShowPreview"
-              class="rounded-lg border bg-white dark:bg-card p-3 text-sm overflow-x-auto"
-              v-html="previewHtml || PREVIEW_FALLBACK_HTML"
-            />
-          </div>
-
-          <div class="flex gap-2 justify-end">
-            <Button variant="outline" @click="cancelForm">
-              {{ t('common.cancel') }}
-            </Button>
-            <Button @click="saveComponent">
-              {{ formMode === 'create' ? t('common.create') : t('common.save') }}
-            </Button>
-          </div>
-        </div>
-
-        <!-- ─── 组件列表 ─── -->
         <div v-if="!isShowForm">
           <Tabs v-model="activeComponentTab" class="w-full">
             <TabsList class="grid w-full grid-cols-2">
@@ -628,7 +330,6 @@ watch(() => uiStore.isShowComponentDialog, (val) => {
                   <div class="flex-1 min-w-0">
                     <div class="flex flex-wrap items-center gap-1.5 mb-0.5">
                       <code class="text-sm font-semibold text-primary">{{ def.name }}</code>
-                      <span class="text-[10px] border px-1.5 py-px rounded-full bg-muted text-muted-foreground">{{ t('component.builtinBadge') }}</span>
                       <span class="text-[10px] border px-1.5 py-px rounded-full bg-muted text-muted-foreground">
                         {{ t('component.propCount', { count: def.props.length }) }}
                       </span>
@@ -675,22 +376,22 @@ watch(() => uiStore.isShowComponentDialog, (val) => {
                         {{ t('component.propDocs') }}
                       </p>
                       <div class="hidden sm:block rounded-lg border overflow-hidden">
-                        <table class="w-full text-xs">
-                          <thead class="bg-muted/50">
-                            <tr>
-                              <th class="text-left px-3 py-2 font-medium text-muted-foreground w-28">
+                        <table class="w-full text-xs border-separate border-spacing-0">
+                          <thead>
+                            <tr class="bg-muted/40">
+                              <th class="text-left px-3 py-2 font-medium text-muted-foreground w-28 border-b border-r border-border/50">
                                 {{ t('component.propNameCol') }}
                               </th>
-                              <th class="text-left px-3 py-2 font-medium text-muted-foreground w-16">
+                              <th class="text-left px-3 py-2 font-medium text-muted-foreground w-16 border-b border-r border-border/50">
                                 {{ t('component.typeCol') }}
                               </th>
-                              <th class="text-left px-3 py-2 font-medium text-muted-foreground w-16">
+                              <th class="text-left px-3 py-2 font-medium text-muted-foreground w-16 border-b border-r border-border/50">
                                 {{ t('component.statusCol') }}
                               </th>
-                              <th class="text-left px-3 py-2 font-medium text-muted-foreground">
+                              <th class="text-left px-3 py-2 font-medium text-muted-foreground border-b border-r border-border/50">
                                 {{ t('component.descCol') }}
                               </th>
-                              <th class="text-left px-3 py-2 font-medium text-muted-foreground w-24">
+                              <th class="text-left px-3 py-2 font-medium text-muted-foreground w-24 border-b border-border/50">
                                 {{ t('component.defaultCol') }}
                               </th>
                             </tr>
@@ -699,24 +400,24 @@ watch(() => uiStore.isShowComponentDialog, (val) => {
                             <tr
                               v-for="prop in def.props"
                               :key="prop.name"
-                              class="border-t border-border/50"
+                              class="bg-background"
                             >
-                              <td class="px-3 py-2">
+                              <td class="px-3 py-2 border-b border-r border-border/30">
                                 <code class="font-mono text-primary font-medium">{{ prop.name }}</code>
                               </td>
-                              <td class="px-3 py-2">
+                              <td class="px-3 py-2 border-b border-r border-border/30">
                                 <code class="text-[10px] bg-muted/60 px-1.5 py-0.5 rounded text-muted-foreground">{{ prop.type || 'string' }}</code>
                               </td>
-                              <td class="px-3 py-2">
+                              <td class="px-3 py-2 border-b border-r border-border/30">
                                 <span
                                   class="inline-flex items-center px-1.5 py-0.5 rounded border text-[10px] font-medium"
                                   :class="propTypeBadge(prop).class"
                                 >{{ propTypeBadge(prop).label }}</span>
                               </td>
-                              <td class="px-3 py-2 text-muted-foreground">
+                              <td class="px-3 py-2 border-b border-r border-border/30 text-muted-foreground">
                                 {{ prop.description || '—' }}
                               </td>
-                              <td class="px-3 py-2">
+                              <td class="px-3 py-2 border-b border-border/30">
                                 <code v-if="prop.default" class="text-[11px] bg-muted px-1.5 py-0.5 rounded text-foreground">{{ prop.default }}</code>
                                 <span v-else class="text-muted-foreground/50">—</span>
                               </td>
@@ -749,22 +450,30 @@ watch(() => uiStore.isShowComponentDialog, (val) => {
                       </div>
                     </div>
 
-                    <div>
-                      <p class="text-xs font-medium text-muted-foreground mb-1.5">
-                        {{ t('component.example') }}
-                      </p>
-                      <div class="relative group">
-                        <pre class="text-xs font-mono bg-muted rounded-lg px-3 py-2.5 overflow-x-auto text-foreground/80 pr-10 leading-relaxed"><code>{{ def.example || componentStore.buildSnippet(def) }}</code></pre>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          class="absolute right-1.5 top-1.5 size-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                          @click="copySnippet(def)"
-                        >
-                          <Check v-if="copiedId === def.id" class="size-3 text-green-500" />
-                          <Copy v-else class="size-3 text-muted-foreground" />
-                        </Button>
-                      </div>
+                    <ComponentPropFill
+                      :def="def"
+                      @update:values="(v) => onFillValues(def.id, v)"
+                    />
+
+                    <div class="flex items-center gap-2">
+                      <Button
+                        variant="default"
+                        size="sm"
+                        class="h-7 px-2.5 text-xs gap-1"
+                        @click="insertSnippet(def)"
+                      >
+                        <Zap class="size-3" />
+                        {{ t('component.insertWithValues') }}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        class="size-7 text-muted-foreground"
+                        @click="copySnippet(def)"
+                      >
+                        <Check v-if="copiedId === def.id" class="size-3 text-green-500" />
+                        <Copy v-else class="size-3" />
+                      </Button>
                     </div>
 
                     <div v-if="isMpProfile(def)" class="border-t pt-3 space-y-2">
@@ -1018,30 +727,22 @@ watch(() => uiStore.isShowComponentDialog, (val) => {
                           </div>
                         </div>
                       </div>
-                      <div v-else>
-                        <p class="text-xs text-muted-foreground italic">
-                          {{ t('component.noPropsDefined') }}
-                        </p>
-                      </div>
 
-                      <div>
-                        <p class="text-xs font-medium text-muted-foreground mb-1.5">
-                          {{ t('component.example') }}
-                        </p>
-                        <div class="relative group">
-                          <pre class="text-xs font-mono bg-muted rounded-lg px-3 py-2.5 overflow-x-auto text-foreground/80 pr-10 leading-relaxed"><code>{{ def.example || componentStore.buildSnippet(def) }}</code></pre>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            class="absolute right-1.5 top-1.5 size-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                            @click="copySnippet(def)"
-                          >
-                            <Check v-if="copiedId === def.id" class="size-3 text-green-500" />
-                            <Copy v-else class="size-3 text-muted-foreground" />
-                          </Button>
-                        </div>
-                      </div>
+                      <ComponentPropFill
+                        :def="def"
+                        @update:values="(v) => onFillValues(def.id, v)"
+                      />
+
                       <div class="flex items-center gap-2 pt-1 border-t">
+                        <Button
+                          variant="default"
+                          size="sm"
+                          class="h-7 px-2.5 text-xs gap-1"
+                          @click="insertSnippet(def)"
+                        >
+                          <Zap class="size-3" />
+                          {{ t('component.insertWithValues') }}
+                        </Button>
                         <Button
                           variant="outline"
                           size="sm"

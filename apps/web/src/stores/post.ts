@@ -1,8 +1,7 @@
 import type { Post } from '@/types/post'
-import { debounce } from 'es-toolkit'
-import { v4 as uuidv4 } from 'uuid'
-import DEFAULT_CONTENT from '@/assets/example/markdown.md?raw'
+import { getDefaultContent } from '@/assets/example/default-content'
 import { formatLocalDateTime, t } from '@/i18n/translate'
+import { debounce } from '@/lib/debounce'
 import { documentRepo, getLoadedDocuments, store } from '@/storage'
 import { addPrefix } from '@/storage/prefix'
 import { useEditorStore } from '@/stores/editor'
@@ -10,12 +9,13 @@ import { useEditorStore } from '@/stores/editor'
 export type { Post } from '@/types/post'
 
 function createDefaultPost(): Post {
+  const content = getDefaultContent()
   return {
-    id: uuidv4(),
+    id: crypto.randomUUID(),
     title: t('store.post.defaultTitle'),
-    content: DEFAULT_CONTENT,
+    content,
     history: [
-      { datetime: formatLocalDateTime(), content: DEFAULT_CONTENT },
+      { datetime: formatLocalDateTime(), content },
     ],
     createDatetime: new Date(),
     updateDatetime: new Date(),
@@ -27,7 +27,7 @@ function normalizePosts(raw: Post[]): Post[] {
     const now = Date.now()
     return {
       ...post,
-      id: post.id ?? uuidv4(),
+      id: post.id ?? crypto.randomUUID(),
       createDatetime: new Date(post.createDatetime ?? now + index),
       updateDatetime: new Date(post.updateDatetime ?? now + index),
       history: post.history ?? [],
@@ -39,10 +39,7 @@ function postSignature(post: Post): string {
   return `${post.id}:${post.title}:${post.content.length}:${post.updateDatetime}:${post.parentId ?? ``}:${post.history?.length ?? 0}:${post.collapsed ? 1 : 0}`
 }
 
-/**
- * 文章管理 Store
- * 负责管理文章列表、当前文章、文章 CRUD 操作
- */
+/** Post list, current post, and CRUD operations. */
 export const usePostStore = defineStore(`post`, () => {
   const loaded = getLoadedDocuments()
   const posts = ref<Post[]>(
@@ -62,7 +59,7 @@ export const usePostStore = defineStore(`post`, () => {
     await documentRepo.savePost(post)
   }, 500)
 
-  /** 删除等关键操作立即落盘，避免防抖未完成时刷新导致数据回弹 */
+  /** Flush immediately on delete etc. so a refresh before debounce finishes does not restore stale data. */
   async function persistImmediately(): Promise<void> {
     persistAll.cancel()
     persistOne.cancel()
@@ -161,7 +158,7 @@ export const usePostStore = defineStore(`post`, () => {
 
   const addPost = (title: string, parentId: string | null = null) => {
     const newPost: Post = {
-      id: uuidv4(),
+      id: crypto.randomUUID(),
       title,
       content: `# ${title}`,
       history: [

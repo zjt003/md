@@ -1,19 +1,18 @@
 import type { EditorView } from '@codemirror/view'
 import { Compartment, EditorState } from '@codemirror/state'
 import { EditorView as CMEditorView } from '@codemirror/view'
-import { cssSetup, DEFAULT_CUSTOM_THEME, theme as editorTheme } from '@md/shared'
+import { cssSetup, theme as editorTheme, getDefaultCustomTheme } from '@md/shared'
 import { sanitizeTitle } from '@md/shared/utils/basicHelpers'
 import { downloadFile } from '@md/shared/utils/fileHelpers'
-import { v4 as uuidv4 } from 'uuid'
-import { t } from '@/i18n/translate'
+import { getLocale, t } from '@/i18n/translate'
 import { store } from '@/storage'
 import { addPrefix } from '@/storage/prefix'
 
-const DEFAULT_CSS_CONTENT = DEFAULT_CUSTOM_THEME
+function getDefaultCssContent() {
+  return getDefaultCustomTheme(getLocale())
+}
 
-/**
- * CSS 编辑器配置接口
- */
+/** CSS editor tab configuration. */
 export interface CssContentConfig {
   active: string
   tabs: {
@@ -28,35 +27,29 @@ export interface CssContentConfig {
   isSelectMode?: boolean
 }
 
-/**
- * CSS 编辑器 Store
- * 负责管理自定义 CSS 编辑器及其配置
- */
+/** Manages the custom CSS editor and its tab configuration. */
 export const useCssEditorStore = defineStore(`cssEditor`, () => {
   const isDark = useDark()
 
-  // CSS 编辑器实例
   const cssEditor = ref<EditorView | null>(null)
   const cssEditorThemeCompartment = ref<Compartment | null>(null)
 
-  // CSS 内容配置
   const cssContentConfig = store.reactive<CssContentConfig>(addPrefix(`css_content_config`), {
     active: ``,
     tabs: [],
   })
 
-  // 兼容旧数据：补齐缺失的 id / createDatetime / updateDatetime，并将 active 迁移为 id
+  // Backfill missing id / timestamps; migrate active from name to id
   onBeforeMount(() => {
     const now = new Date()
 
-    // 如果没有任何 tab，初始化默认方案
     if (cssContentConfig.value.tabs.length === 0) {
-      const defaultId = uuidv4()
+      const defaultId = crypto.randomUUID()
       cssContentConfig.value.tabs = [{
         id: defaultId,
         title: t('store.cssEditor.schemeDefault'),
         name: t('store.cssEditor.schemeDefault'),
-        content: DEFAULT_CSS_CONTENT,
+        content: getDefaultCssContent(),
         createDatetime: now,
         updateDatetime: now,
       }]
@@ -66,33 +59,31 @@ export const useCssEditorStore = defineStore(`cssEditor`, () => {
 
     cssContentConfig.value.tabs = cssContentConfig.value.tabs.map((tab, index) => ({
       ...tab,
-      id: tab.id ?? uuidv4(),
+      id: tab.id ?? crypto.randomUUID(),
       createDatetime: tab.createDatetime ?? new Date(now.getTime() + index),
       updateDatetime: tab.updateDatetime ?? new Date(now.getTime() + index),
     }))
 
-    // 将旧的 active（name）迁移为 id
     const activeById = cssContentConfig.value.tabs.find(t => t.id === cssContentConfig.value.active)
     if (!activeById) {
-      // 旧数据中 active 存的是 name，找到对应 tab 再存 id
+      // Legacy data stored active as tab name; resolve to id
       const activeByName = cssContentConfig.value.tabs.find(t => t.name === cssContentConfig.value.active)
       cssContentConfig.value.active = activeByName?.id ?? cssContentConfig.value.tabs[0].id
     }
   })
 
-  // 获取当前激活的 Tab
   const getCurrentTab = () => {
     const tab = cssContentConfig.value.tabs.find(tab => tab.id === cssContentConfig.value.active)
     if (!tab) {
       // Fallback: if tabs are empty or corrupted, create a default tab
       if (cssContentConfig.value.tabs.length === 0) {
-        const defaultId = uuidv4()
+        const defaultId = crypto.randomUUID()
         const now = new Date()
         cssContentConfig.value.tabs = [{
           id: defaultId,
           title: t('store.cssEditor.schemeDefault'),
           name: t('store.cssEditor.schemeDefault'),
-          content: DEFAULT_CSS_CONTENT,
+          content: getDefaultCssContent(),
           createDatetime: now,
           updateDatetime: now,
         }]
@@ -105,12 +96,10 @@ export const useCssEditorStore = defineStore(`cssEditor`, () => {
     return tab
   }
 
-  // 获取当前 Tab 的内容
   const getCurrentTabContent = () => {
     return getCurrentTab().content
   }
 
-  // 设置编辑器内容
   const setCssEditorValue = (content: string) => {
     if (cssEditor.value) {
       cssEditor.value.dispatch({
@@ -119,15 +108,13 @@ export const useCssEditorStore = defineStore(`cssEditor`, () => {
     }
   }
 
-  // 切换 Tab 的回调（由外部传入，用于触发渲染刷新）
+  /** External callback to refresh preview when the active CSS tab changes. */
   let onTabChangedCallback: ((content: string) => void) | null = null
 
-  // 设置切换 Tab 的回调
   const setOnTabChangedCallback = (callback: (content: string) => void) => {
     onTabChangedCallback = callback
   }
 
-  // 切换 Tab
   const tabChanged = (id: string) => {
     cssContentConfig.value.active = id
     const tab = cssContentConfig.value.tabs.find(tab => tab.id === id)
@@ -135,26 +122,22 @@ export const useCssEditorStore = defineStore(`cssEditor`, () => {
       return
     setCssEditorValue(tab.content)
 
-    // 触发回调以刷新渲染
     if (onTabChangedCallback) {
       onTabChangedCallback(tab.content)
     }
   }
 
-  // 重命名 Tab
   const renameTab = (name: string) => {
     const tab = getCurrentTab()
     tab.title = name
     tab.name = name
-    // active 存的是 id，重命名不需要更新 active
   }
 
-  // 添加 CSS 方案
   const addCssContentTab = (name: string, initialContent?: string) => {
-    const content = initialContent || DEFAULT_CSS_CONTENT
+    const content = initialContent ?? getDefaultCssContent()
     const now = new Date()
     cssContentConfig.value.tabs.push({
-      id: uuidv4(),
+      id: crypto.randomUUID(),
       name,
       title: name,
       content,
@@ -165,15 +148,14 @@ export const useCssEditorStore = defineStore(`cssEditor`, () => {
     cssContentConfig.value.active = newTab.id
     setCssEditorValue(content)
 
-    // 触发回调以刷新渲染（使用新方案的 CSS）
     if (onTabChangedCallback) {
       onTabChangedCallback(content)
     }
   }
 
-  // 重置 CSS 配置
   const resetCssConfig = () => {
-    const defaultId = uuidv4()
+    const defaultContent = getDefaultCssContent()
+    const defaultId = crypto.randomUUID()
     cssContentConfig.value = {
       active: defaultId,
       tabs: [
@@ -181,7 +163,7 @@ export const useCssEditorStore = defineStore(`cssEditor`, () => {
           id: defaultId,
           title: t('store.cssEditor.schemeDefaultSpaced'),
           name: t('store.cssEditor.schemeDefaultSpaced'),
-          content: DEFAULT_CSS_CONTENT,
+          content: defaultContent,
           createDatetime: new Date(),
           updateDatetime: new Date(),
         },
@@ -190,12 +172,11 @@ export const useCssEditorStore = defineStore(`cssEditor`, () => {
 
     if (cssEditor.value) {
       cssEditor.value.dispatch({
-        changes: { from: 0, to: cssEditor.value.state.doc.length, insert: DEFAULT_CSS_CONTENT },
+        changes: { from: 0, to: cssEditor.value.state.doc.length, insert: defaultContent },
       })
     }
   }
 
-  // 初始化 CSS 编辑器
   const initCssEditor = (onUpdate: (content: string) => void) => {
     const cssEditorDom = document.querySelector<HTMLTextAreaElement>(`#cssEditor`)
     if (!cssEditorDom)
@@ -203,15 +184,12 @@ export const useCssEditorStore = defineStore(`cssEditor`, () => {
 
     cssEditorDom.value = getCurrentTab().content
 
-    // 创建 CSS 编辑器的容器
     const cssContainer = document.createElement(`div`)
     cssContainer.className = 'w-full h-full'
     cssEditorDom.parentNode?.replaceChild(cssContainer, cssEditorDom)
 
-    // 创建主题 Compartment 用于动态切换
     cssEditorThemeCompartment.value = new Compartment()
 
-    // 创建 CSS 编辑器
     const state = EditorState.create({
       doc: getCurrentTab().content,
       extensions: [
@@ -235,7 +213,6 @@ export const useCssEditorStore = defineStore(`cssEditor`, () => {
     }))
   }
 
-  // 监听深色模式变化
   watch(isDark, () => {
     if (cssEditor.value && cssEditorThemeCompartment.value) {
       cssEditor.value.dispatch({
@@ -244,7 +221,6 @@ export const useCssEditorStore = defineStore(`cssEditor`, () => {
     }
   })
 
-  // 滚动到指定标题级别的 CSS 区域并选中
   const scrollToHeading = (level: string) => {
     if (!cssEditor.value)
       return

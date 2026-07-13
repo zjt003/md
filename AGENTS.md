@@ -106,15 +106,15 @@ pnpm mcp dev          # MCP Server 监听模式
 
 ### 国际化（i18n，`@md/web`）
 
-Web 主应用与部分浏览器扩展 UI 支持 **zh-CN**、**en-US**；VS Code 扩展、uTools、CLI、MCP **未**国际化。
+Web 主应用与部分浏览器扩展 UI 支持 **zh-CN**、**zh-TW**、**en-US**、**ja-JP**；VS Code 扩展、uTools、CLI、MCP **未**国际化。
 
 - **库**：`vue-i18n`（composition API，`legacy: false`），在 `apps/web/vite.config.ts` 中通过 `unplugin-auto-import` 自动导入 `useI18n`
-- **文案**：`apps/web/src/i18n/messages/{zh-CN,en-US}/`（`common`、`editor`、`dialog`、`store`、`ai`、`upload`、`chrome`）
+- **文案**：`apps/web/src/i18n/messages/{zh-CN,zh-TW,en-US,ja-JP}/`（`common`、`editor`、`dialog`、`store`、`ai`、`upload`、`chrome`）
 - **组件内**：`useI18n()` + `t('key')`；**Store / 工具函数**：`@/i18n/translate` 的 `t()` / `getLocale()` / `formatLocalDateTime()`
 - **语言状态**：`useLocaleStore`（持久化 key：`locale`）；用户可在 **偏好设置**（`Ctrl+,`）→ General 切换
 - **启动**：`await initStorage()` → `setupI18n(detectInitialLocale())` → Pinia → `useLocaleStore()`（见 `apps/web/src/bootstrap.ts`）；`index.html` 启动屏从 `localStorage` 读取 locale
 - **云同步**：`locale` 在 `SYNC_SETTING_KEYS` 中，远端应用后由 `hydrateSyncedSettings` 热更新
-- **约定**：新增用户可见文案须同时维护 zh-CN 与 en-US；在 computed 中调用 `t()` 且需随语言切换更新时，应依赖 `locale`（例如 `void locale.value`）
+- **约定**：新增用户可见文案须同时维护 zh-CN、zh-TW、en-US 与 ja-JP；在 computed 中调用 `t()` 且需随语言切换更新时，应依赖 `locale`（例如 `void locale.value`）
 
 ## Lint 与格式化
 
@@ -122,6 +122,7 @@ Web 主应用与部分浏览器扩展 UI 支持 **zh-CN**、**en-US**；VS Code 
 - **Prettier:** 固定版本 `2.8.8`（通过 `pnpm-workspace.yaml` 的 `overrides` 强制）
 - **Pre-commit 钩子:** `lint-staged` 对所有文件执行 `eslint --fix`
 - 规则：不使用分号，关闭 `no-unused-vars`、`no-console`、`no-debugger`
+- **代码注释：** 统一英文。保留非显而易见的 why / 约束 / 兼容性说明；删除复述下一行代码的噪音注释。勿改动 `i18n/messages` 等用户可见文案。
 
 ## 依赖管理
 
@@ -129,12 +130,14 @@ Web 主应用与部分浏览器扩展 UI 支持 **zh-CN**、**en-US**；VS Code 
 
 ### 升级依赖
 
-1. **Prettier 必须固定在 `2.8.8`** — 通过 `pnpm-workspace.yaml` 的 `overrides.prettier` 强制
-2. **Patch 文件：** 如果打了 patch 的依赖升级了，必须同步更新 `patches/` 中对应的 patch 文件：
-   - `@codemirror/view` → `patches/@codemirror__view@6.43.4.patch`（导出 `MeasureRequest` 接口，修复 macOS 上 Alt+Shift 快捷键处理）
-   - `juice` → `patches/juice@12.1.0.patch`（为 `parseCSS` 返回值增加空值检查）
-3. 更新 `pnpm-workspace.yaml` 中的 `patchedDependencies` 以匹配新版本
-4. 运行 `pnpm install` 重新生成 `pnpm-lock.yaml`
+1. **共享版本用 catalog** — 跨包共用的工具链版本集中在 `pnpm-workspace.yaml` 的 `catalog`（`typescript`、`vitest`、`wrangler`、`@types/node`、`marked`、`@codemirror/state|view` 等）；workspace 内各 `package.json` 用 `"catalog:"` 引用。**仓库根 `package.json` 因 `private: false` 可被 npm 消费，须写普通 semver，勿用 `catalog:`。**包专属依赖可继续写版本号（`pnpm/json-enforce-catalog` 已关闭）
+2. **Prettier 必须固定在 `2.8.8`** — 通过 catalog + `overrides.prettier` 强制（根 package 直接写 `2.8.8`）
+3. **Patch 文件：** 如果打了 patch 的依赖升级了，必须同步更新 `patches/` 中对应的 patch 文件：
+   - `@codemirror/view` → `patches/@codemirror__view@6.43.6.patch`（导出 `MeasureRequest` 接口，修复 macOS 上 Alt+Shift 快捷键处理）
+   - `front-matter` → `patches/front-matter@4.0.2.patch`
+   - `juice` → `patches/juice@12.1.1.patch`（为 `parseCSS` 返回值增加空值检查）
+4. 更新 `pnpm-workspace.yaml` 中的 `patchedDependencies` 以匹配新版本
+5. 运行 `pnpm install` 重新生成 `pnpm-lock.yaml`；可用 `pnpm dedupe` 收敛可合并的间接依赖
 
 ### 安全覆盖
 

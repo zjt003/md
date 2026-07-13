@@ -2,19 +2,32 @@ import type { Token } from 'marked'
 import type { ComponentRegistry } from './component'
 
 /**
- * 渲染器选项（新主题系统）
- * 主题样式通过 CSS 注入，不再通过 JS 对象传递
- * 注意：isUseIndent 和 isUseJustify 现在通过 CSS 变量系统处理，不需要传递给渲染器
+ * Renderer options (CSS-injected theme system).
+ * isUseIndent / isUseJustify are handled via CSS variables, not passed to the renderer.
  */
 export interface DiagramMessages {
   mermaidLoading: string
-  /** 支持 `{detail}` 占位符 */
+  /** Supports `{detail}` placeholder */
   mermaidError: string
   plantumlLoading: string
   plantumlError: string
   infographicLoading: string
-  /** 支持 `{detail}` 占位符 */
+  /** Supports `{detail}` placeholder */
   infographicError: string
+}
+
+export interface CountMessages {
+  summary: string
+}
+
+/** Render-pipeline UI copy (injected by locale on Web) */
+export interface RenderMessages {
+  /** Footnote reference link title */
+  footnoteTitle: string
+  /** Unknown custom component message; supports `{name}` placeholder */
+  unknownComponent: string
+  /** Block math loading placeholder */
+  katexLoading: string
 }
 
 export interface IOpts {
@@ -24,10 +37,14 @@ export interface IOpts {
   isMacCodeBlock?: boolean
   isShowLineNumber?: boolean
   themeMode?: 'light' | 'dark'
-  /** 自定义组件注册表 */
+  /** Custom component registry */
   components?: ComponentRegistry
-  /** 异步图表加载/失败文案（Web 端按 locale 注入） */
+  /** Async diagram load/error copy (injected by locale on Web) */
   diagramMessages?: DiagramMessages
+  /** Reading-time summary copy (injected by locale on Web) */
+  countMessages?: CountMessages
+  /** Footnotes, unknown components, math loading, etc. (injected by locale on Web) */
+  renderMessages?: RenderMessages
 }
 
 export interface IConfigOption<VT = string> {

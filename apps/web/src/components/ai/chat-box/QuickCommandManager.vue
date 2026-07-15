@@ -3,6 +3,7 @@ import { ref, watch } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Textarea } from '@/components/ui/textarea'
 import { useQuickCommandsStore } from '@/stores/quickCommands'
 
@@ -10,8 +11,13 @@ const props = defineProps<{ open: boolean }>()
 const emit = defineEmits([`update:open`])
 
 const dialogOpen = ref(props.open)
+const confirmDeleteId = ref<string | null>(null)
 watch(() => props.open, v => (dialogOpen.value = v))
-watch(dialogOpen, v => emit(`update:open`, v))
+watch(dialogOpen, (v) => {
+  emit(`update:open`, v)
+  if (!v)
+    confirmDeleteId.value = null
+})
 
 const store = useQuickCommandsStore()
 const { t } = useI18n()
@@ -30,7 +36,10 @@ const editingId = ref<string | null>(null)
 const editLabel = ref(``)
 const editTemplate = ref(``)
 
-function beginEdit(cmd: { id: string, label: string, template: string }) {
+function beginEdit(cmd: { id: string, label: string, template: string, builtin: boolean }) {
+  if (cmd.builtin)
+    return
+  confirmDeleteId.value = null
   editingId.value = cmd.id
   editLabel.value = cmd.label
   editTemplate.value = cmd.template
@@ -61,7 +70,7 @@ function saveEdit() {
           :key="cmd.id"
           class="flex flex-col gap-2 border rounded-md p-3"
         >
-          <template v-if="editingId === cmd.id">
+          <template v-if="!cmd.builtin && editingId === cmd.id">
             <Input v-model="editLabel" :placeholder="t('ai.quickCommand.namePlaceholder')" />
             <Textarea
               v-model="editTemplate"
@@ -79,17 +88,53 @@ function saveEdit() {
           </template>
 
           <template v-else>
-            <div class="flex items-center justify-between">
-              <span class="break-all text-sm">{{ cmd.label }}</span>
-              <div class="flex gap-1">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex min-w-0 items-center gap-2">
+                <span class="break-all text-sm">{{ cmd.label }}</span>
+                <span
+                  v-if="cmd.builtin"
+                  class="bg-muted text-muted-foreground shrink-0 rounded px-1.5 py-0.5 text-[10px] leading-none"
+                >
+                  {{ t('ai.quickCommand.builtin') }}
+                </span>
+              </div>
+              <div v-if="!cmd.builtin" class="flex shrink-0 gap-1">
                 <Button variant="ghost" size="xs" @click="beginEdit(cmd)">
                   {{ t('common.edit') }}
                 </Button>
-                <Button variant="outline" size="xs" @click="store.remove(cmd.id)">
-                  {{ t('common.delete') }}
-                </Button>
+                <Popover
+                  :open="confirmDeleteId === cmd.id"
+                  @update:open="v => { if (!v) confirmDeleteId = null }"
+                >
+                  <PopoverTrigger as-child>
+                    <Button variant="outline" size="xs" @click="confirmDeleteId = cmd.id">
+                      {{ t('common.delete') }}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent class="w-auto p-3">
+                    <div class="flex flex-col gap-2">
+                      <p class="text-sm">
+                        {{ t('confirm.deleteItem', { name: cmd.label }) }}
+                      </p>
+                      <div class="flex justify-end gap-2">
+                        <Button size="xs" variant="outline" @click="confirmDeleteId = null">
+                          {{ t('common.cancel') }}
+                        </Button>
+                        <Button size="xs" @click="store.remove(cmd.id); confirmDeleteId = null">
+                          {{ t('common.confirm') }}
+                        </Button>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
+            <p
+              v-if="cmd.builtin"
+              class="text-muted-foreground whitespace-pre-wrap break-all text-xs"
+            >
+              {{ cmd.template }}
+            </p>
           </template>
         </div>
       </div>

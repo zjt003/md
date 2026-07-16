@@ -74,7 +74,7 @@ function setCountStatus(value: boolean) {
 
 function onLocaleChange(value: string) {
   if ((SUPPORTED_LOCALES as readonly string[]).includes(value))
-    localeStore.setLocale(value as AppLocale)
+    void localeStore.setLocale(value as AppLocale)
 }
 </script>
 
@@ -114,7 +114,7 @@ function onLocaleChange(value: string) {
           />
         </div>
 
-        <div class="flex items-center justify-between gap-4 border-b py-3">
+        <div class="flex items-center justify-between gap-4 py-3">
           <div class="min-w-0 space-y-0.5">
             <Label for="pref-dark-mode">{{ t('preferences.darkMode.label') }}</Label>
           </div>

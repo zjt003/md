@@ -1,7 +1,9 @@
 import type { Post } from '@/types/post'
+import { uuidv4 } from '@md/shared/utils/uuid'
 import { getDefaultContent } from '@/assets/example/default-content'
-import { formatLocalDateTime, t } from '@/i18n/translate'
+import { t } from '@/i18n/translate'
 import { debounce } from '@/lib/debounce'
+import { normalizePostHistory, toStoredDateTime } from '@/lib/format/datetime'
 import { documentRepo, getLoadedDocuments, store } from '@/storage'
 import { addPrefix } from '@/storage/prefix'
 import { useEditorStore } from '@/stores/editor'
@@ -11,11 +13,11 @@ export type { Post } from '@/types/post'
 function createDefaultPost(): Post {
   const content = getDefaultContent()
   return {
-    id: crypto.randomUUID(),
+    id: uuidv4(),
     title: t('store.post.defaultTitle'),
     content,
     history: [
-      { datetime: formatLocalDateTime(), content },
+      { datetime: toStoredDateTime(), content },
     ],
     createDatetime: new Date(),
     updateDatetime: new Date(),
@@ -27,10 +29,10 @@ function normalizePosts(raw: Post[]): Post[] {
     const now = Date.now()
     return {
       ...post,
-      id: post.id ?? crypto.randomUUID(),
+      id: post.id ?? uuidv4(),
       createDatetime: new Date(post.createDatetime ?? now + index),
       updateDatetime: new Date(post.updateDatetime ?? now + index),
-      history: post.history ?? [],
+      history: normalizePostHistory(post.history),
     }
   })
 }
@@ -158,11 +160,11 @@ export const usePostStore = defineStore(`post`, () => {
 
   const addPost = (title: string, parentId: string | null = null) => {
     const newPost: Post = {
-      id: crypto.randomUUID(),
+      id: uuidv4(),
       title,
       content: `# ${title}`,
       history: [
-        { datetime: formatLocalDateTime(), content: `# ${title}` },
+        { datetime: toStoredDateTime(), content: `# ${title}` },
       ],
       createDatetime: new Date(),
       updateDatetime: new Date(),

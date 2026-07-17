@@ -3,6 +3,8 @@ import type { PerThemeSettings, PerThemeSettingsMap, ThemeName } from '@md/share
 import type { IndexedDBEngine } from '@/storage/engines/indexed-db'
 import type { Post } from '@/types/post'
 import { defaultPerThemeSettings, defaultStyleConfig } from '@md/shared/configs'
+import { uuidv4 } from '@md/shared/utils/uuid'
+import { normalizePostHistory } from '@/lib/format/datetime'
 import { getDatabase } from '@/storage/db'
 import {
   isAppLocalStorageKey,
@@ -106,7 +108,7 @@ function parsePosts(raw: string): Post[] | null {
         ...post,
         createDatetime: new Date(post.createDatetime ?? now + index),
         updateDatetime: new Date(post.updateDatetime ?? now + index),
-        history: post.history ?? [],
+        history: normalizePostHistory(post.history),
       }
     })
   }
@@ -197,7 +199,7 @@ export async function migrateMpProfile(engine: IndexedDBEngine): Promise<void> {
     }
 
     const migrated = [{
-      id: crypto.randomUUID(),
+      id: uuidv4(),
       mpId: old.id ?? ``,
       name: old.name ?? ``,
       logo: old.logo ?? ``,

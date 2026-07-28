@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Component } from 'vue'
-import { BookOpen, Code2, FileText, FunctionSquare, PieChart } from '@lucide/vue'
+import { BookText, Code2, FileText, FunctionSquare, PieChart } from '@lucide/vue'
 import { computed, ref } from 'vue'
 import PanelDialog from '@/components/shared/panel-dialog/PanelDialog.vue'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -43,7 +43,7 @@ const syntaxIcons: Record<string, Component> = {
   code: Code2,
   math: FunctionSquare,
   diagram: PieChart,
-  other: BookOpen,
+  other: BookText,
 }
 
 const syntaxCategories = computed<SyntaxCategory[]>(() =>
@@ -76,7 +76,7 @@ async function copySyntax(syntax: string) {
     v-model:open="dialogOpen"
     :title="t('markdownHelp.title')"
     :description="t('markdownHelp.description')"
-    :icon="BookOpen"
+    :icon="BookText"
     size="2xl"
   >
     <div class="px-4 py-4 sm:px-6">
@@ -97,7 +97,7 @@ async function copySyntax(syntax: string) {
           v-for="cat in syntaxCategories"
           :key="cat.id"
           :value="cat.id"
-          class="mt-4 max-h-[min(50vh,24rem)] space-y-3 overflow-y-auto"
+          class="mt-4 h-[min(55vh,28rem)] space-y-3 overflow-y-auto"
         >
           <div
             v-for="item in cat.items"

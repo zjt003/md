@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { CheckSquare, ChevronsDownUp, ChevronsUpDown, Download, Ellipsis, FileText, Plus, Regex, Replace, ReplaceAll, Search, Upload, X } from '@lucide/vue'
-import { initRenderer } from '@md/core'
+import { hljs, initRenderer } from '@md/core'
 import { postProcessHtml, renderMarkdown } from '@md/core/utils'
 import { CONTENT_FONT_LANG } from '@/i18n/constants'
 import { formatLocalDateTime } from '@/i18n/translate'
@@ -165,6 +165,11 @@ function openHistoryDialog(id: string) {
 
 const currentHistoryList = computed(() => {
   return postStore.getPostById(currentPostId.value!)?.history ?? []
+})
+
+const highlightedMarkdown = computed(() => {
+  const content = currentHistoryList.value[currentHistoryIndex.value]?.content ?? ''
+  return hljs.highlight(content, { language: `markdown` }).value
 })
 
 /** Isolated renderer — must not call useRenderStore().render() (mutates live PreviewPanel). */
@@ -1188,10 +1193,17 @@ function handleDragEnd() {
           <li
             v-for="(item, idx) in currentHistoryList"
             :key="idx"
-            class="flex cursor-pointer items-center rounded-lg px-3 py-2.5 text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-accent-foreground"
-            :class="{ 'bg-primary/8 text-primary font-medium': currentHistoryIndex === idx }"
+            class="relative flex cursor-pointer items-center rounded-lg px-3 py-2.5 transition-colors duration-150"
+            :class="{
+              'bg-accent text-accent-foreground': currentHistoryIndex === idx,
+              'text-foreground/70 hover:text-foreground hover:bg-accent/50': currentHistoryIndex !== idx,
+            }"
             @click="currentHistoryIndex = idx"
           >
+            <span
+              v-if="currentHistoryIndex === idx"
+              class="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-primary"
+            />
             <span class="text-xs leading-snug">{{ formatHistoryDatetime(item.datetime) }}</span>
           </li>
         </ul>
@@ -1213,8 +1225,8 @@ function handleDragEnd() {
             </TabsList>
 
             <TabsContent value="content" class="flex-1 overflow-y-auto mt-2">
-              <div class="rounded-lg bg-muted/30 p-4 h-full overflow-y-auto">
-                <pre class="whitespace-pre-wrap text-sm leading-relaxed break-all font-[inherit]">{{ currentHistoryList[currentHistoryIndex]?.content ?? '' }}</pre>
+              <div class="rounded-lg h-full overflow-y-auto">
+                <pre class="whitespace-pre-wrap text-sm leading-relaxed break-all font-[inherit] h-full"><code class="hljs h-full" v-html="highlightedMarkdown" /></pre>
               </div>
             </TabsContent>
 

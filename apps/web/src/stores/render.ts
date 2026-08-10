@@ -106,23 +106,21 @@ export const useRenderStore = defineStore(`render`, () => {
     ].join(`\u0001`)
   }
 
-  const extractTitles = () => {
-    const div = document.createElement(`div`)
-    div.innerHTML = output.value
-    const list = div.querySelectorAll<HTMLElement>(`[data-heading]`)
+  /**
+   * Inject heading anchor ids (`#0`, `#1`, …) used by outline navigation and
+   * fill the title list from headings collected during render. Pure string
+   * work — no DOM parse/serialize round-trip per render.
+   */
+  const extractTitles = (html: string): string => {
+    const headings = renderer!.getHeadings()
+    titleList.value = headings.map((heading, i) => ({
+      url: `#${i}`,
+      title: heading.text,
+      level: heading.level,
+    }))
 
-    titleList.value = []
     let i = 0
-    for (const item of list) {
-      item.setAttribute(`id`, `${i}`)
-      titleList.value.push({
-        url: `#${i}`,
-        title: `${item.textContent}`,
-        level: Number(item.tagName.slice(1)),
-      })
-      i++
-    }
-    output.value = div.innerHTML
+    return html.replace(/data-heading="true"/g, () => `data-heading="true" id="${i++}"`)
   }
 
   const render = (content: string, options?: RenderOptions) => {
@@ -159,9 +157,8 @@ export const useRenderStore = defineStore(`render`, () => {
     readingTime.words = readingTimeResult.words
     readingTime.minutes = Math.ceil(readingTimeResult.minutes)
 
-    output.value = postProcessHtml(baseHtml, readingTimeResult, renderer)
+    output.value = extractTitles(postProcessHtml(baseHtml, readingTimeResult, renderer))
 
-    extractTitles()
     lastContent = content
     lastOptionsFingerprint = optionsFingerprint
 
@@ -178,6 +175,5 @@ export const useRenderStore = defineStore(`render`, () => {
     initRendererInstance,
     getRenderer,
     render,
-    extractTitles,
   }
 })

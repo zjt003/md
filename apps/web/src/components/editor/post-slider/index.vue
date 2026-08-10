@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { CheckSquare, ChevronsDownUp, ChevronsUpDown, Download, Ellipsis, FileText, Plus, Regex, Replace, ReplaceAll, Search, Upload, X } from '@lucide/vue'
-import { hljs, initRenderer } from '@md/core'
-import { postProcessHtml, renderMarkdown } from '@md/core/utils'
 import { CONTENT_FONT_LANG } from '@/i18n/constants'
 import { formatLocalDateTime } from '@/i18n/translate'
 import { copyPlain } from '@/lib/browser/clipboard'
+import { getSearchRegex, scanPosts } from '@/lib/search-posts'
 import { downloadMD, exportPostsAsZip } from '@/services/export'
 import { scopeThemeCss } from '@/services/export/share-styles'
 import { useConfirmStore } from '@/stores/confirm'
@@ -21,6 +20,10 @@ import {
 
 const { t, locale } = useI18n()
 const confirmStore = useConfirmStore()
+
+// Overrides the auto-imported component so diff-match-patch stays out of this
+// chunk and only loads when the diff tab is first shown.
+const VersionDiffViewer = defineAsyncComponent(() => import('./VersionDiffViewer.vue'))
 
 function formatHistoryDatetime(datetime: number | string) {
   void locale.value
@@ -152,7 +155,44 @@ const compareTargetIndex = ref(`1`)
 
 const HISTORY_PREVIEW_SCOPE = `#history-preview-output`
 const styleTag = `style` as const
-let historyRenderer: ReturnType<typeof initRenderer> | null = null
+
+interface HistoryCoreModules {
+  hljs: (typeof import('@md/core'))[`hljs`]
+  initRenderer: (typeof import('@md/core'))[`initRenderer`]
+  renderMarkdown: (typeof import('@md/core/utils'))[`renderMarkdown`]
+  postProcessHtml: (typeof import('@md/core/utils'))[`postProcessHtml`]
+}
+
+// The history dialog pulls in the whole @md/core renderer stack + hljs. Load it
+// on demand so opening the post slider doesn't pay that cost (notably the cold
+// on-demand transform in vite dev).
+const coreModules = shallowRef<HistoryCoreModules | null>(null)
+const coreModulesFailed = ref(false)
+let coreModulesPromise: Promise<HistoryCoreModules> | null = null
+
+function ensureCoreModules(): Promise<HistoryCoreModules> {
+  coreModulesPromise ??= Promise.all([import('@md/core'), import('@md/core/utils')])
+    .then(([core, coreUtils]) => {
+      const modules: HistoryCoreModules = {
+        hljs: core.hljs,
+        initRenderer: core.initRenderer,
+        renderMarkdown: coreUtils.renderMarkdown,
+        postProcessHtml: coreUtils.postProcessHtml,
+      }
+      coreModules.value = modules
+      coreModulesFailed.value = false
+      return modules
+    })
+    .catch((error) => {
+      // Allow a later retry (e.g. transient network failure on the chunk).
+      coreModulesPromise = null
+      coreModulesFailed.value = true
+      throw error
+    })
+  return coreModulesPromise
+}
+
+let historyRenderer: ReturnType<HistoryCoreModules[`initRenderer`]> | null = null
 
 function openHistoryDialog(id: string) {
   postSliderMenu.closeMenu()
@@ -161,6 +201,9 @@ function openHistoryDialog(id: string) {
   historyViewMode.value = `content`
   compareTargetIndex.value = `1`
   isOpenHistoryDialog.value = true
+  void ensureCoreModules().catch((error) => {
+    console.error(`[PostSlider] Failed to load history renderer modules:`, error)
+  })
 }
 
 const currentHistoryList = computed(() => {
@@ -169,13 +212,27 @@ const currentHistoryList = computed(() => {
 
 const highlightedMarkdown = computed(() => {
   const content = currentHistoryList.value[currentHistoryIndex.value]?.content ?? ''
-  return hljs.highlight(content, { language: `markdown` }).value
+  const core = coreModules.value
+  // Rendered via v-html: escape raw markdown until the highlighter chunk
+  // arrives, so source like `<tag>` can't be parsed as HTML.
+  if (!core) {
+    return content
+      .replace(/&/g, `&amp;`)
+      .replace(/</g, `&lt;`)
+      .replace(/>/g, `&gt;`)
+      .replace(/"/g, `&quot;`)
+      .replace(/'/g, `&#39;`)
+  }
+  return core.hljs.highlight(content, { language: `markdown` }).value
 })
 
 /** Isolated renderer — must not call useRenderStore().render() (mutates live PreviewPanel). */
 function renderHistoryContent(content: string): string {
+  const core = coreModules.value
+  if (!core)
+    return ``
   if (!historyRenderer)
-    historyRenderer = initRenderer({})
+    historyRenderer = core.initRenderer({})
 
   historyRenderer.reset({
     citeStatus: themeStore.isCiteStatus,
@@ -206,8 +263,8 @@ function renderHistoryContent(content: string): string {
     },
   })
 
-  const { html, readingTime } = renderMarkdown(content, historyRenderer)
-  return postProcessHtml(html, readingTime, historyRenderer)
+  const { html, readingTime } = core.renderMarkdown(content, historyRenderer)
+  return core.postProcessHtml(html, readingTime, historyRenderer)
 }
 
 const previewHtml = computed(() => {
@@ -222,6 +279,19 @@ const previewHtml = computed(() => {
   catch {
     return `<p class="text-muted-foreground text-sm">${t('store.render.renderFailed')}</p>`
   }
+})
+
+const hasHistoryContent = computed(() => {
+  return Boolean(currentHistoryList.value[currentHistoryIndex.value]?.content)
+})
+
+/** Distinguishes "no version content" from "renderer chunk still loading / failed". */
+const previewFallbackText = computed(() => {
+  if (!hasHistoryContent.value)
+    return t(`common.noData`)
+  if (coreModulesFailed.value)
+    return t(`store.render.renderFailed`)
+  return t(`common.loading`)
 })
 
 const historyPreviewCss = computed(() => {
@@ -263,6 +333,7 @@ function recoverHistory() {
 
   const content = post.history[currentHistoryIndex.value].content
   post.content = content
+  post.updateDatetime = new Date()
   const ed = toRaw(editor.value!)
   ed.dispatch({
     changes: { from: 0, to: ed.state.doc.length, insert: content },
@@ -308,112 +379,27 @@ function closeSearch() {
   showReplace.value = false
 }
 
-interface HighlightPart {
-  text: string
-  highlight: boolean
-}
+// Debounced so each keystroke does not synchronously scan every post body.
+const debouncedSearchQuery = refDebounced(searchQuery, 250)
 
-function getSearchRegex(query: string): RegExp | null {
-  if (!query.trim())
-    return null
-  try {
-    if (isRegex.value) {
-      return new RegExp(query, `gm${isCaseSensitive.value ? `` : `i`}`)
-    }
-    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, `\\$&`)
-    return new RegExp(escaped, `gm${isCaseSensitive.value ? `` : `i`}`)
-  }
-  catch {
-    return null
-  }
-}
+const searchScan = computed(() =>
+  scanPosts(posts.value, debouncedSearchQuery.value, {
+    isRegex: isRegex.value,
+    isCaseSensitive: isCaseSensitive.value,
+  }),
+)
 
-function highlightParts(text: string, query: string): HighlightPart[] {
-  if (!query)
-    return [{ text, highlight: false }]
-  const regex = getSearchRegex(query)
-  if (!regex)
-    return [{ text, highlight: false }]
-  const parts: HighlightPart[] = []
-  let lastIndex = 0
-  let match = regex.exec(text)
-  while (match !== null) {
-    if (match.index > lastIndex)
-      parts.push({ text: text.slice(lastIndex, match.index), highlight: false })
-    parts.push({ text: match[0], highlight: true })
-    lastIndex = match.index + match[0].length
-    if (match[0].length === 0)
-      regex.lastIndex++
-    match = regex.exec(text)
-  }
-  if (lastIndex < text.length)
-    parts.push({ text: text.slice(lastIndex), highlight: false })
-  return parts
-}
-
-function getContentSnippet(content: string, query: string): string {
-  if (!query.trim())
-    return ``
-  const regex = getSearchRegex(query)
-  if (!regex)
-    return ``
-  const match = regex.exec(content)
-  if (!match)
-    return ``
-  const idx = match.index
-  const matchLen = match[0].length
-  const start = Math.max(0, idx - 20)
-  const end = Math.min(content.length, idx + matchLen + 40)
-  let snippet = content.slice(start, end).replace(/\n/g, ` `)
-  if (start > 0)
-    snippet = `…${snippet}`
-  if (end < content.length)
-    snippet = `${snippet}…`
-  return snippet
-}
-
-const searchResults = computed(() => {
-  const q = searchQuery.value.trim()
-  if (!q)
-    return []
-  const regex = getSearchRegex(q)
-  if (!regex)
-    return []
-  return posts.value
-    .filter(post => regex.test(post.title) || regex.test(post.content))
-    .map((post) => {
-      const snippet = getContentSnippet(post.content, searchQuery.value.trim())
-      return {
-        ...post,
-        titleParts: highlightParts(post.title, searchQuery.value.trim()),
-        snippetParts: snippet ? highlightParts(snippet, searchQuery.value.trim()) : [],
-      }
-    })
-})
-
-const totalMatches = computed(() => {
-  const q = searchQuery.value.trim()
-  if (!q)
-    return 0
-  const regex = getSearchRegex(q)
-  if (!regex)
-    return 0
-  let count = 0
-  posts.value.forEach((post) => {
-    const titleMatches = (post.title.match(regex) || []).length
-    regex.lastIndex = 0
-    const contentMatches = (post.content.match(regex) || []).length
-    regex.lastIndex = 0
-    count += titleMatches + contentMatches
-  })
-  return count
-})
+const searchResults = computed(() => searchScan.value.results)
+const totalMatches = computed(() => searchScan.value.totalMatches)
 
 function replaceInText(text: string, search: string, replace: string): string {
-  const regex = getSearchRegex(search)
+  const regex = getSearchRegex(search, { isRegex: isRegex.value, isCaseSensitive: isCaseSensitive.value })
   if (!regex)
     return text
-  return text.replace(regex, replace)
+  // Skip zero-width matches so empty-matching patterns (`a*`, `\b`) do not
+  // insert the replacement at every position. The callback form also inserts
+  // the replacement literally instead of interpreting `$` patterns.
+  return text.replace(regex, m => (m.length > 0 ? replace : m))
 }
 
 function autoResizeReplace(e: Event) {
@@ -427,7 +413,7 @@ function replaceFirst() {
   const q = searchQuery.value.trim()
   if (!q)
     return
-  const regex = getSearchRegex(q)
+  const regex = getSearchRegex(q, { isRegex: isRegex.value, isCaseSensitive: isCaseSensitive.value })
   if (!regex)
     return
   for (const post of posts.value) {
@@ -458,15 +444,15 @@ function replaceAll() {
   const q = searchQuery.value.trim()
   if (!q)
     return
-  const regex = getSearchRegex(q)
+  const regex = getSearchRegex(q, { isRegex: isRegex.value, isCaseSensitive: isCaseSensitive.value })
   if (!regex)
     return
   let count = 0
   posts.value.forEach((post) => {
     regex.lastIndex = 0
-    const titleMatches = (post.title.match(regex) || []).length
+    const titleMatches = (post.title.match(regex) || []).filter(m => m.length > 0).length
     regex.lastIndex = 0
-    const contentMatches = (post.content.match(regex) || []).length
+    const contentMatches = (post.content.match(regex) || []).filter(m => m.length > 0).length
     if (titleMatches > 0) {
       regex.lastIndex = 0
       postStore.renamePost(post.id, replaceInText(post.title, q, replaceQuery.value))
@@ -506,6 +492,20 @@ const sortedPosts = computed(() => {
         return +new Date(a.createDatetime) - +new Date(b.createDatetime)
     }
   })
+})
+
+// Group once so each tree level does O(1) lookup instead of filtering the whole list per node.
+const postChildrenMap = computed(() => {
+  const map = new Map<string | null, typeof posts.value>()
+  for (const post of sortedPosts.value) {
+    const key = post.parentId ?? null
+    const children = map.get(key)
+    if (children)
+      children.push(post)
+    else
+      map.set(key, [post])
+  }
+  return map
 })
 
 const dragover = ref(false)
@@ -942,10 +942,11 @@ function handleDragEnd() {
           {{ t('post.matchStats', { matches: totalMatches, posts: searchResults.length }) }}
         </div>
         <template v-if="searchResults.length">
-          <a
+          <button
             v-for="result in searchResults"
             :key="result.id"
-            class="group relative flex w-full cursor-pointer flex-col gap-0.5 rounded-lg px-2 py-[7px] text-[13px] leading-snug transition-all duration-150 ease-out"
+            type="button"
+            class="search-result-item group relative flex w-full cursor-pointer flex-col gap-0.5 rounded-lg px-2 py-[7px] text-left text-[13px] leading-snug transition-all duration-150 ease-out"
             :class="{
               'bg-accent text-accent-foreground font-medium': postStore.currentPostId === result.id,
               'text-foreground/70 hover:text-foreground hover:bg-accent/50': postStore.currentPostId !== result.id,
@@ -971,7 +972,7 @@ function handleDragEnd() {
                 <span v-else>{{ part.text }}</span>
               </template>
             </span>
-          </a>
+          </button>
         </template>
         <div v-else class="flex flex-col items-center justify-center gap-2 py-12 px-6">
           <Search class="size-5 text-muted-foreground/30" />
@@ -985,7 +986,7 @@ function handleDragEnd() {
         <PostItem
           v-if="sortedPosts.length"
           :parent-id="null"
-          :sorted-posts="sortedPosts"
+          :children-map="postChildrenMap"
           :actions="{
             startRenamePost,
             openHistoryDialog,
@@ -1188,30 +1189,31 @@ function handleDragEnd() {
         <DialogDescription>{{ t('post.historyDescription') }}</DialogDescription>
       </DialogHeader>
 
-      <div class="h-[50vh] flex gap-3">
-        <ul class="w-[160px] shrink-0 space-y-0.5 overflow-y-auto thin-scrollbar">
-          <li
-            v-for="(item, idx) in currentHistoryList"
-            :key="idx"
-            class="relative flex cursor-pointer items-center rounded-lg px-3 py-2.5 transition-colors duration-150"
-            :class="{
-              'bg-accent text-accent-foreground': currentHistoryIndex === idx,
-              'text-foreground/70 hover:text-foreground hover:bg-accent/50': currentHistoryIndex !== idx,
-            }"
-            @click="currentHistoryIndex = idx"
-          >
-            <span
-              v-if="currentHistoryIndex === idx"
-              class="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-primary"
-            />
-            <span class="text-xs leading-snug">{{ formatHistoryDatetime(item.datetime) }}</span>
+      <div class="h-[50vh] flex gap-3 w-full min-w-0">
+        <ul class="w-[104px] sm:w-[160px] shrink-0 space-y-0.5 overflow-y-auto thin-scrollbar">
+          <li v-for="(item, idx) in currentHistoryList" :key="idx">
+            <button
+              type="button"
+              class="relative flex w-full cursor-pointer items-center rounded-lg px-3 py-2.5 text-left transition-colors duration-150"
+              :class="{
+                'bg-accent text-accent-foreground': currentHistoryIndex === idx,
+                'text-foreground/70 hover:text-foreground hover:bg-accent/50': currentHistoryIndex !== idx,
+              }"
+              @click="currentHistoryIndex = idx"
+            >
+              <span
+                v-if="currentHistoryIndex === idx"
+                class="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-primary"
+              />
+              <span class="text-xs leading-snug">{{ formatHistoryDatetime(item.datetime) }}</span>
+            </button>
           </li>
         </ul>
 
         <Separator orientation="vertical" />
 
-        <div class="flex-1 flex flex-col overflow-hidden">
-          <Tabs v-model="historyViewMode" class="flex flex-col h-full">
+        <div class="flex-1 flex flex-col overflow-hidden min-w-0">
+          <Tabs v-model="historyViewMode" class="flex flex-col h-full min-w-0 min-h-0">
             <TabsList class="shrink-0 w-fit">
               <TabsTrigger value="content">
                 {{ t('post.originalContent') }}
@@ -1224,16 +1226,16 @@ function handleDragEnd() {
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="content" class="flex-1 overflow-y-auto mt-2">
+            <TabsContent value="content" class="flex-1 min-w-0 min-h-0 overflow-y-auto mt-2">
               <div class="rounded-lg h-full overflow-y-auto">
                 <pre class="whitespace-pre-wrap text-sm leading-relaxed break-all font-[inherit] h-full"><code class="hljs h-full" v-html="highlightedMarkdown" /></pre>
               </div>
             </TabsContent>
 
-            <TabsContent value="preview" class="flex-1 overflow-hidden mt-2">
+            <TabsContent value="preview" class="flex-1 min-w-0 min-h-0 overflow-hidden mt-2">
               <div
                 v-if="previewHtml"
-                class="history-preview-wrapper h-full overflow-y-auto rounded-lg border bg-background"
+                class="history-preview-wrapper h-full overflow-y-auto overflow-x-hidden rounded-lg border bg-background"
               >
                 <div class="preview mx-auto">
                   <component :is="styleTag" v-if="historyPreviewCss">
@@ -1248,11 +1250,11 @@ function handleDragEnd() {
                 </div>
               </div>
               <div v-else class="flex items-center justify-center h-full rounded-lg border bg-background text-muted-foreground text-sm">
-                {{ t('common.noData') }}
+                {{ previewFallbackText }}
               </div>
             </TabsContent>
 
-            <TabsContent value="diff" class="flex-1 overflow-hidden mt-2 pt-1">
+            <TabsContent value="diff" class="flex-1 min-w-0 min-h-0 overflow-hidden mt-2 pt-1">
               <div class="flex items-center gap-2 mb-2 text-xs text-muted-foreground shrink-0">
                 <span>{{ t('post.compareLabel') }}</span>
                 <Select v-model="compareTargetIndex">
@@ -1310,6 +1312,12 @@ function handleDragEnd() {
   scrollbar-color: hsl(var(--border)) transparent;
 }
 
+/* Skip rendering off-screen search hits in long result lists. */
+.search-result-item {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 48px;
+}
+
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 200ms ease;
@@ -1337,11 +1345,24 @@ function handleDragEnd() {
 .history-preview-wrapper .preview {
   position: relative;
   min-height: 100%;
+  max-width: 100%;
   margin: 0 auto;
   padding: 20px;
   font-size: 14px;
   box-sizing: border-box;
   word-wrap: break-word;
   overflow-wrap: break-word;
+}
+
+/* Defensive clamps: rendered diagrams/SVGs carry fixed pixel widths, and wide
+   tables must scroll inside their own box instead of stretching the dialog. */
+.history-preview-wrapper .preview svg {
+  max-width: 100%;
+}
+
+.history-preview-wrapper .preview table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
 }
 </style>

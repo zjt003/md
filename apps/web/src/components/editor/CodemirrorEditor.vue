@@ -16,7 +16,7 @@ const FolderSourcePanel = defineAsyncComponent(() => import('@/components/editor
 const CssEditor = defineAsyncComponent(() => import('@/components/editor/CssEditor.vue'))
 const RightSlider = defineAsyncComponent(() => import('@/components/editor/RightSlider.vue'))
 const UploadImgDialog = defineAsyncComponent(() => import('@/components/editor/dialogs/UploadImgDialog.vue'))
-const InsertFormDialog = defineAsyncComponent(() => import('@/components/editor/dialogs/InsertFormDialog.vue'))
+const TableEditDialog = defineAsyncComponent(() => import('@/components/editor/dialogs/TableEditDialog.vue'))
 const ImportMarkdownDialog = defineAsyncComponent(() => import('@/components/editor/dialogs/ImportMarkdownDialog.vue'))
 const LocalImageUploadDialog = defineAsyncComponent(() => import('@/components/editor/dialogs/LocalImageUploadDialog.vue'))
 const FormulaEditorDialog = defineAsyncComponent(() => import('@/components/editor/dialogs/FormulaEditorDialog.vue'))
@@ -34,7 +34,7 @@ const {
   viewMode,
   enableScrollSync,
   isShowUploadImgDialog,
-  isShowInsertFormDialog,
+  isShowTableEditDialog,
   isShowImportMdDialog,
   isShowLocalImageUpload,
   isShowFormulaEditorDialog,
@@ -118,6 +118,31 @@ const postSliderPanelRef = ref<InstanceType<typeof ResizablePanel> | null>(null)
 const cssEditorPanelRef = ref<InstanceType<typeof ResizablePanel> | null>(null)
 const rightSliderPanelRef = ref<InstanceType<typeof ResizablePanel> | null>(null)
 
+type ResizablePanelRef = Ref<InstanceType<typeof ResizablePanel> | null>
+
+/**
+ * reka-ui's imperative resize() throws when the group layout does not include
+ * the panel yet (mount / HMR remount / constraint-change race). Defer past the
+ * whole Vue flush with rAF — nextTick still runs inside the flush, where
+ * setLayout re-queues SplitterGroup's own update and Vue aborts with
+ * "Maximum recursive updates exceeded". Skip no-op resizes so imperative
+ * calls cannot start a constraint cascade; a skipped resize is harmless
+ * because the min/max/default-size props still drive the layout.
+ */
+function resizePanelSafely(panelRef: ResizablePanelRef, size: number) {
+  requestAnimationFrame(() => {
+    try {
+      const panel = panelRef.value
+      if (!panel || Math.abs(panel.getSize() - size) < 0.01)
+        return
+      panel.resize(size)
+    }
+    catch {
+      // Panel not registered in the group layout yet; props still apply.
+    }
+  })
+}
+
 function redistributePanelSizes() {
   const cssTarget = !isMobile.value && uiStore.isShowCssEditor ? 25 : 0
   const rightTarget = !isMobile.value && isOpenRightSlider.value ? 30 : 0
@@ -125,56 +150,54 @@ function redistributePanelSizes() {
 
   const mode = viewMode.value
   if (mode === `edit`) {
-    editorResizablePanelRef.value?.resize(contentSpace)
-    previewResizablePanelRef.value?.resize(0)
+    resizePanelSafely(editorResizablePanelRef, contentSpace)
+    resizePanelSafely(previewResizablePanelRef, 0)
   }
   else if (mode === `preview`) {
-    editorResizablePanelRef.value?.resize(0)
-    previewResizablePanelRef.value?.resize(contentSpace)
+    resizePanelSafely(editorResizablePanelRef, 0)
+    resizePanelSafely(previewResizablePanelRef, contentSpace)
   }
   else {
     const half = contentSpace / 2
-    editorResizablePanelRef.value?.resize(half)
-    previewResizablePanelRef.value?.resize(half)
+    resizePanelSafely(editorResizablePanelRef, half)
+    resizePanelSafely(previewResizablePanelRef, half)
   }
 
-  cssEditorPanelRef.value?.resize(cssTarget)
-  rightSliderPanelRef.value?.resize(rightTarget)
+  resizePanelSafely(cssEditorPanelRef, cssTarget)
+  resizePanelSafely(rightSliderPanelRef, rightTarget)
 }
 
-watch(viewMode, () => {
-  nextTick(redistributePanelSizes)
-})
+watch(viewMode, redistributePanelSizes)
 
-watch(() => uiStore.isShowCssEditor, () => {
-  nextTick(redistributePanelSizes)
-})
+watch(() => uiStore.isShowCssEditor, redistributePanelSizes)
 
-watch(isOpenRightSlider, () => {
-  nextTick(redistributePanelSizes)
-})
+watch(isOpenRightSlider, redistributePanelSizes)
 
 watch(isOpenPostSlider, (open) => {
   if (isMobile.value)
     return
-  nextTick(() => {
-    postSliderPanelRef.value?.resize(open ? 20 : 0)
-  })
+  resizePanelSafely(postSliderPanelRef, open ? 20 : 0)
 })
 
 watch(isMobile, (mobile) => {
   if (mobile)
-    postSliderPanelRef.value?.resize(0)
+    resizePanelSafely(postSliderPanelRef, 0)
   else if (isOpenPostSlider.value)
-    nextTick(() => postSliderPanelRef.value?.resize(20))
+    resizePanelSafely(postSliderPanelRef, 20)
 })
 
 onMounted(() => {
-  nextTick(() => {
-    redistributePanelSizes()
-    if (!isMobile.value && isOpenPostSlider.value)
-      postSliderPanelRef.value?.resize(20)
-  })
+  redistributePanelSizes()
+  if (!isMobile.value && isOpenPostSlider.value)
+    resizePanelSafely(postSliderPanelRef, 20)
+
+  // Warm up the async post-slider chunk while idle: fetches the chunk in prod,
+  // and in dev finishes the on-demand transform before the user opens the panel.
+  const preloadPostSlider = () => { void import('@/components/editor/post-slider/index.vue') }
+  if (typeof window.requestIdleCallback === `function`)
+    window.requestIdleCallback(() => preloadPostSlider())
+  else
+    setTimeout(preloadPostSlider, 3000)
 })
 
 const isImgLoading = computed(() => unref(editorPanelCompRef.value?.isImgLoading) ?? false)
@@ -282,7 +305,7 @@ const isImgLoading = computed(() => unref(editorPanelCompRef.value?.isImgLoading
 
       <UploadImgDialog v-if="isShowUploadImgDialog" @upload-image="handleUploadImage" />
 
-      <InsertFormDialog v-if="isShowInsertFormDialog" />
+      <TableEditDialog v-if="isShowTableEditDialog" />
 
       <ImportMarkdownDialog v-if="isShowImportMdDialog" />
 

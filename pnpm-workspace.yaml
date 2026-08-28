@@ -11,20 +11,18 @@ packages:
 overrides:
   '@codemirror/state': 'catalog:'
   '@codemirror/view': 'catalog:'
-  # GHSA-frvp-7c67-39w9 (dependabot/312): @modelcontextprotocol/sdk pins ^1.19.9; fix only in 2.0.5+
-  '@hono/node-server': ^2.1.1
   # Pin typescript-eslint to one exact patch (eslint-plugin-command otherwise pulls 8.60.x).
-  '@typescript-eslint/eslint-plugin': 8.67.0
-  '@typescript-eslint/parser': 8.67.0
-  '@typescript-eslint/project-service': 8.67.0
-  '@typescript-eslint/rule-tester': 8.67.0
-  '@typescript-eslint/scope-manager': 8.67.0
-  '@typescript-eslint/tsconfig-utils': 8.67.0
-  '@typescript-eslint/type-utils': 8.67.0
-  '@typescript-eslint/types': 8.67.0
-  '@typescript-eslint/typescript-estree': 8.67.0
-  '@typescript-eslint/utils': 8.67.0
-  '@typescript-eslint/visitor-keys': 8.67.0
+  '@typescript-eslint/eslint-plugin': 8.68.0
+  '@typescript-eslint/parser': 8.68.0
+  '@typescript-eslint/project-service': 8.68.0
+  '@typescript-eslint/rule-tester': 8.68.0
+  '@typescript-eslint/scope-manager': 8.68.0
+  '@typescript-eslint/tsconfig-utils': 8.68.0
+  '@typescript-eslint/type-utils': 8.68.0
+  '@typescript-eslint/types': 8.68.0
+  '@typescript-eslint/typescript-estree': 8.68.0
+  '@typescript-eslint/utils': 8.68.0
+  '@typescript-eslint/visitor-keys': 8.68.0
   '@webext-core/isolated-element': 1.1.4
   # CVE-2026-39244 / GHSA-xcpc-8h2w-3j85 (dependabot/311): firefox-profile pins ~0.5.x
   adm-zip: ^0.6.0
@@ -35,7 +33,7 @@ overrides:
   core-js: ^3.50.0
   cross-spawn@<7: ^7.0.6
   crypto-browserify: npm:empty-module@0.0.2
-  dompurify: ^3.4.13
+  dompurify: ^3.4.14
   esbuild: '>=0.28.2'
   # CVE-2026-16221 / GHSA-v2hh-gcrm-f6hx (dependabot/314): ajv pins fast-uri ^3.0.1
   fast-uri: ^3.1.4
@@ -43,10 +41,10 @@ overrides:
   glob@<8: ^13.0.6
   glob@^10: ^13.0.6
   glob@^11: ^11.1.0
-  # CVE-2026-69207 / GHSA-8j4g-w8fx-2239 (dependabot/317): @modelcontextprotocol/sdk pins hono 4.12.33
-  hono: ^4.13.3
+  hono: ^4.13.5
   ini: '>=7.0.0'
-  js-yaml: ^4.3.0
+  js-yaml@^4: ^4.3.1
+  js-yaml@^5: ^5.4.1
   jsdom>undici: ^7.25.0
   lodash-es: ^4.18.1
   markdown-it: ^14.3.0
@@ -86,23 +84,23 @@ allowBuilds:
 
 patchedDependencies:
   '@codemirror/view@6.43.9': patches/@codemirror__view@6.43.9.patch
-  front-matter@4.0.2: patches/front-matter@4.0.2.patch
   juice@12.1.2: patches/juice@12.1.2.patch
 
 # Shared direct-dep versions across the monorepo (reference with `catalog:`).
 catalog:
-  '@cloudflare/workers-types': ^5.20260818.1
+  '@cloudflare/workers-types': ^5.20260827.1
   '@codemirror/state': 6.7.1
   '@codemirror/view': 6.43.9
-  '@types/node': ^26.2.0
-  isomorphic-dompurify: ^3.22.0
-  marked: ^18.0.10
+  '@types/node': ^26.4.0
+  isomorphic-dompurify: ^3.23.0
+  marked: ^18.0.11
   prettier: 2.8.8
   tsx: ^4.23.12
   typescript: ~6.0.3
-  uuid: ^14.0.1
-  vitest: ^4.1.10
-  wrangler: ^4.124.0
+  uuid: ^14.0.2
+  vitest: ^4.1.11
+  wrangler: ^4.127.0
+  zod: ^4.4.3
 
 peerDependencyRules:
   allowedVersions:

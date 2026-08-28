@@ -3,6 +3,7 @@
   "type": "module",
   "version": "2.1.0",
   "private": true,
+  "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
     "./renderer": "./src/renderer/index.ts",
@@ -18,15 +19,15 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@antv/infographic": "^0.2.19",
+    "@antv/infographic": "^0.2.20",
     "@md/shared": "workspace:*",
     "entities": "^8.0.0",
     "fflate": "^0.8.3",
-    "front-matter": "^4.0.2",
     "highlight.js": "^11.12.0",
     "isomorphic-dompurify": "catalog:",
+    "js-yaml": "^5.4.1",
     "marked": "catalog:",
-    "mermaid": "^11.16.1"
+    "mermaid": "^11.17.2"
   },
   "devDependencies": {
     "@md/config": "workspace:*",

@@ -9,8 +9,9 @@ import { useCssEditorStore } from '@/stores/cssEditor'
 /**
  * Theme and style configuration.
  *
- * Each theme has its own settings (primaryColor, fontFamily, fontSize, codeBlockTheme,
- * headingStyles, isShowLineNumber, isMacCodeBlock); switching themes loads the matching config.
+ * Each theme has its own settings (primaryColor, fontFamily, fontSize, lineHeight,
+ * blockSpacing, linkColor, blockquoteBackground, codeBlockTheme, headingStyles,
+ * isShowLineNumber, isMacCodeBlock); switching themes loads the matching config.
  */
 export const useThemeStore = defineStore(`theme`, () => {
   const theme = store.reactive<ThemeName>(addPrefix(`theme`), defaultStyleConfig.theme)
@@ -37,6 +38,28 @@ export const useThemeStore = defineStore(`theme`, () => {
   const fontSize = computed<string>({
     get: () => currentSettings.value.fontSize,
     set: (v: string) => { setThemeField(`fontSize`, v) },
+  })
+
+  // Settings persisted before these options existed have no value stored, so the
+  // getters fall back to the default instead of leaving the picker unselected.
+  const lineHeight = computed<string>({
+    get: () => currentSettings.value.lineHeight ?? defaultStyleConfig.lineHeight,
+    set: (v: string) => { setThemeField(`lineHeight`, v) },
+  })
+
+  const blockSpacing = computed<string>({
+    get: () => currentSettings.value.blockSpacing ?? defaultStyleConfig.blockSpacing,
+    set: (v: string) => { setThemeField(`blockSpacing`, v) },
+  })
+
+  const linkColor = computed<string>({
+    get: () => currentSettings.value.linkColor ?? defaultStyleConfig.linkColor,
+    set: (v: string) => { setThemeField(`linkColor`, v) },
+  })
+
+  const blockquoteBackground = computed<string>({
+    get: () => currentSettings.value.blockquoteBackground ?? defaultStyleConfig.blockquoteBackground,
+    set: (v: string) => { setThemeField(`blockquoteBackground`, v) },
   })
 
   const codeBlockTheme = computed<string>({
@@ -147,6 +170,10 @@ export const useThemeStore = defineStore(`theme`, () => {
           primaryColor: primaryColor.value,
           fontFamily: fontFamily.value,
           fontSize: fontSize.value,
+          lineHeight: lineHeight.value,
+          blockSpacing: blockSpacing.value,
+          linkColor: linkColor.value,
+          blockquoteBackground: blockquoteBackground.value,
           isUseIndent: isUseIndent.value,
           isUseJustify: isUseJustify.value,
           headingStyles: headingStyles.value,
@@ -164,6 +191,10 @@ export const useThemeStore = defineStore(`theme`, () => {
     fontFamily,
     fontSize,
     fontSizeNumber,
+    lineHeight,
+    blockSpacing,
+    linkColor,
+    blockquoteBackground,
     primaryColor,
     codeBlockTheme,
     legend,

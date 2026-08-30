@@ -81,7 +81,7 @@ pnpm mcp dev          # MCP Server 监听模式
 
 ### 渲染管线
 
-1. `@md/core` 封装 `marked`，实现自定义扩展（Mermaid、PlantUML、Ruby、KaTeX、TOC、alert 块、infographic、slider、markup、脚注）
+1. `@md/core` 封装 `marked`，实现自定义扩展（Mermaid、PlantUML、Ruby、KaTeX、TOC、alert 块、infographic、slider、markup、emoji、脚注）
 2. `juice` 内联 CSS 以兼容微信
 3. `isomorphic-dompurify` 净化输出
 4. 主题系统（`@md/core/src/theme/`）注入 CSS 变量
@@ -134,7 +134,6 @@ Web 主应用与部分浏览器扩展 UI 支持 **zh-CN**、**zh-TW**、**en-US*
 2. **Prettier 必须固定在 `2.8.8`** — 通过 catalog + `overrides.prettier` 强制（根 package 直接写 `2.8.8`）
 3. **Patch 文件：** 如果打了 patch 的依赖升级了，必须同步更新 `patches/` 中对应的 patch 文件：
    - `@codemirror/view` → `patches/@codemirror__view@6.43.9.patch`（导出 `MeasureRequest` 接口，修复 macOS 上 Alt+Shift 快捷键处理）
-   - `front-matter` → `patches/front-matter@4.0.2.patch`
    - `juice` → `patches/juice@12.1.2.patch`（为 `parseCSS` 返回值增加空值检查）
 4. 更新 `pnpm-workspace.yaml` 中的 `patchedDependencies` 以匹配新版本
 5. 运行 `pnpm install` 重新生成 `pnpm-lock.yaml`；可用 `pnpm dedupe` 收敛可合并的间接依赖

@@ -138,6 +138,7 @@ export default {
         { name: `删除线`, syntax: `~~删除线~~`, example: `删除线` },
         { name: `高亮`, syntax: `==高亮文本==`, example: `高亮文本` },
         { name: `下划线`, syntax: `++下划线++`, example: `下划线` },
+        { name: `上标`, syntax: `x^2^`, example: `x²`, tip: `紧跟在文字后面书写，内容中不能有空格` },
         { name: `行内代码`, syntax: `\`代码\``, example: `代码` },
         { name: `无序列表`, syntax: `- 项目 1\n- 项目 2\n  - 嵌套项目`, tip: `使用 -、* 或 + 加空格` },
         { name: `有序列表`, syntax: `1. 项目 1\n2. 项目 2`, tip: `数字加点号` },
@@ -163,6 +164,7 @@ export default {
         { name: `信息图`, syntax: `\`\`\`infographic\ninfographic list-row\n...\n\`\`\``, tip: `AntV 信息图引擎` },
       ],
       other: [
+        { name: `Emoji`, syntax: `:rocket: :tada: :+1:`, example: `🚀 🎉 👍`, tip: `使用 GitHub 短代码，未收录的名称将原样显示` },
         { name: `注音标注`, syntax: `[文字]{注音}\n[文字]^(注音)`, example: `你好`, tip: `支持日语假名、拼音等` },
         { name: `幻灯片`, syntax: `<![alt](url1),![alt](url2)>`, tip: `横屏滑动图片，仅支持微信公众号` },
         { name: `HTML 标签`, syntax: `<center>居中内容</center>`, tip: `部分 HTML 标签可用` },

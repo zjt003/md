@@ -10,6 +10,7 @@ import {
   getBuiltInRegistry,
   markedAlert,
   markedComponent,
+  markedEmoji,
   markedFootnotes,
   markedInfographic,
   markedMarkup,
@@ -415,6 +416,10 @@ export function initRenderer(opts: IOpts = {}): RendererAPI {
       return styledContent(`em`, this.parser.parseInline(tokens))
     },
 
+    del({ tokens }: Tokens.Del): string {
+      return styledContent(`del`, this.parser.parseInline(tokens))
+    },
+
     table({ header, rows }: Tokens.Table): string {
       const headerRow = header
         .map((cell) => {
@@ -465,6 +470,7 @@ export function initRenderer(opts: IOpts = {}): RendererAPI {
     () => opts.renderMessages,
   ))
   markdownParser.use(markedMarkup())
+  markdownParser.use(markedEmoji())
   markdownParser.use(markedToc())
   markdownParser.use(markedSlider())
   markdownParser.use(markedAlert({}))

@@ -3,7 +3,7 @@ import type {
   ThemeName,
 } from '@md/shared/configs'
 import type { Format } from 'vue-pick-colors'
-import { ALargeSmall, Code, Droplet, FileCode, ImageIcon, Palette, Pipette, RotateCcw, SquareCode, Store, Type } from '@lucide/vue'
+import { ALargeSmall, AlignVerticalSpaceAround, Code, Droplet, FileCode, ImageIcon, Link, Palette, Pipette, Quote, RotateCcw, Rows3, SquareCode, Store, Type } from '@lucide/vue'
 import {
   codeBlockThemeOptions,
 } from '@md/shared/configs'
@@ -39,6 +39,10 @@ const {
   theme,
   fontFamily,
   fontSize,
+  lineHeight,
+  blockSpacing,
+  linkColor,
+  blockquoteBackground,
   primaryColor,
   codeBlockTheme,
   legend,
@@ -62,6 +66,34 @@ function fontChanged(fonts: string) {
 
 function sizeChanged(size: string) {
   themeStore.fontSize = size
+
+  themeStore.applyCurrentTheme()
+  editorRefresh()
+}
+
+function lineHeightChanged(value: string) {
+  themeStore.lineHeight = value
+
+  themeStore.applyCurrentTheme()
+  editorRefresh()
+}
+
+function blockSpacingChanged(value: string) {
+  themeStore.blockSpacing = value
+
+  themeStore.applyCurrentTheme()
+  editorRefresh()
+}
+
+function linkColorChanged(value: string) {
+  themeStore.linkColor = value
+
+  themeStore.applyCurrentTheme()
+  editorRefresh()
+}
+
+function blockquoteBackgroundChanged(value: string) {
+  themeStore.blockquoteBackground = value
 
   themeStore.applyCurrentTheme()
   editorRefresh()
@@ -157,12 +189,44 @@ const formatOptions = ref<Format[]>([`rgb`, `hex`, `hsl`, `hsv`])
         :icon="ALargeSmall"
       />
       <StyleOptionMenu
+        :title="t('menu.lineHeight')"
+        style-key="lineHeight"
+        :options="localizedStyleOptions.lineHeightOptions"
+        :current="lineHeight"
+        :change="lineHeightChanged"
+        :icon="Rows3"
+      />
+      <StyleOptionMenu
+        :title="t('menu.blockSpacing')"
+        style-key="blockSpacing"
+        :options="localizedStyleOptions.blockSpacingOptions"
+        :current="blockSpacing"
+        :change="blockSpacingChanged"
+        :icon="AlignVerticalSpaceAround"
+      />
+      <StyleOptionMenu
         :title="t('menu.primaryColor')"
         style-key="color"
         :options="localizedStyleOptions.colorOptions"
         :current="primaryColor"
         :change="colorChanged"
         :icon="Droplet"
+      />
+      <StyleOptionMenu
+        :title="t('menu.linkColor')"
+        style-key="linkColor"
+        :options="localizedStyleOptions.linkColorOptions"
+        :current="linkColor"
+        :change="linkColorChanged"
+        :icon="Link"
+      />
+      <StyleOptionMenu
+        :title="t('menu.blockquoteBackground')"
+        style-key="blockquoteBackground"
+        :options="localizedStyleOptions.blockquoteBackgroundOptions"
+        :current="blockquoteBackground"
+        :change="blockquoteBackgroundChanged"
+        :icon="Quote"
       />
       <StyleOptionMenu
         :title="t('menu.codeBlockTheme')"
@@ -250,12 +314,44 @@ const formatOptions = ref<Format[]>([`rgb`, `hex`, `hsl`, `hsv`])
         :icon="ALargeSmall"
       />
       <StyleOptionMenu
+        :title="t('menu.lineHeight')"
+        style-key="lineHeight"
+        :options="localizedStyleOptions.lineHeightOptions"
+        :current="lineHeight"
+        :change="lineHeightChanged"
+        :icon="Rows3"
+      />
+      <StyleOptionMenu
+        :title="t('menu.blockSpacing')"
+        style-key="blockSpacing"
+        :options="localizedStyleOptions.blockSpacingOptions"
+        :current="blockSpacing"
+        :change="blockSpacingChanged"
+        :icon="AlignVerticalSpaceAround"
+      />
+      <StyleOptionMenu
         :title="t('menu.primaryColor')"
         style-key="color"
         :options="localizedStyleOptions.colorOptions"
         :current="primaryColor"
         :change="colorChanged"
         :icon="Droplet"
+      />
+      <StyleOptionMenu
+        :title="t('menu.linkColor')"
+        style-key="linkColor"
+        :options="localizedStyleOptions.linkColorOptions"
+        :current="linkColor"
+        :change="linkColorChanged"
+        :icon="Link"
+      />
+      <StyleOptionMenu
+        :title="t('menu.blockquoteBackground')"
+        style-key="blockquoteBackground"
+        :options="localizedStyleOptions.blockquoteBackgroundOptions"
+        :current="blockquoteBackground"
+        :change="blockquoteBackgroundChanged"
+        :icon="Quote"
       />
       <StyleOptionMenu
         :title="t('menu.codeBlockTheme')"

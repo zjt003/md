@@ -31,6 +31,14 @@ export interface MarkupWavylineToken extends TextToken {
   type: 'markup_wavyline'
 }
 
+export interface MarkupSuperscriptToken extends TextToken {
+  type: 'markup_superscript'
+}
+
+export interface EmojiToken extends TextToken {
+  type: 'emoji'
+}
+
 export interface RubyToken extends TextToken {
   type: 'ruby'
   ruby: string

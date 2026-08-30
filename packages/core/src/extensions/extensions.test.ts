@@ -134,6 +134,92 @@ describe(`markup extension`, () => {
     expect(html).toContain(`class="markup-highlight"`)
     expect(html).toContain(`class="markup-wavyline"`)
   })
+
+  it(`renders superscript directly after a word char`, () => {
+    const html = render(`x^2^ + y^10^ = z`)
+
+    expect((html.match(/class="markup-superscript"/g) ?? []).length).toBe(2)
+    expect(html).toContain(`<sup class="markup-superscript">2</sup>`)
+    expect(html).toContain(`<sup class="markup-superscript">10</sup>`)
+  })
+
+  it(`keeps carets as literal text when superscript cannot pair`, () => {
+    expect(render(`a ^ b ^ c`)).not.toContain(`markup-superscript`)
+    expect(render(`2^10 is 1024`)).not.toContain(`markup-superscript`)
+    expect(render(`^ leading caret`)).not.toContain(`markup-superscript`)
+  })
+
+  it(`leaves ruby hat syntax to the ruby extension`, () => {
+    const html = render(`[汉字]^(han-zi)`)
+
+    expect(html).not.toContain(`markup-superscript`)
+    expect(html).toContain(`data-format="basic-hat"`)
+  })
+})
+
+describe(`strikethrough`, () => {
+  it(`renders del with a theme class`, () => {
+    const html = render(`~~gone~~`)
+
+    expect(html).toContain(`<del class="del">gone</del>`)
+  })
+
+  it(`keeps wavyline distinct from strikethrough`, () => {
+    const html = render(`~~gone~~ and ~wave~`)
+
+    expect(html).toContain(`<del class="del">gone</del>`)
+    expect(html).toContain(`class="markup-wavyline"`)
+  })
+})
+
+describe(`emoji extension`, () => {
+  it(`replaces known shortcodes with emoji characters`, () => {
+    const html = render(`Ship it :rocket: :tada:`)
+
+    expect(html).toContain(`🚀`)
+    expect(html).toContain(`🎉`)
+    expect(html).not.toContain(`:rocket:`)
+  })
+
+  it(`supports the +1 and -1 aliases`, () => {
+    const html = render(`:+1: and :-1:`)
+
+    expect(html).toContain(`👍`)
+    expect(html).toContain(`👎`)
+  })
+
+  it(`leaves unknown shortcodes as literal text`, () => {
+    const html = render(`:definitely_not_an_emoji:`)
+
+    expect(html).toContain(`:definitely_not_an_emoji:`)
+  })
+
+  it(`leaves incidental colon pairs in prose alone`, () => {
+    expect(render(`ratio 3:4:5`)).toContain(`3:4:5`)
+    expect(render(`meeting at 12:30:45`)).toContain(`12:30:45`)
+    expect(render(`key: value`)).toContain(`key: value`)
+  })
+
+  it(`does not replace shortcodes inside inline code`, () => {
+    const html = render(`use \`:rocket:\` to launch`)
+
+    expect(html).toContain(`:rocket:`)
+    expect(html).not.toContain(`🚀`)
+  })
+
+  it(`does not replace shortcodes inside fenced code blocks`, () => {
+    const html = render(`\`\`\`\n:rocket:\n\`\`\``)
+
+    expect(html).toContain(`:rocket:`)
+    expect(html).not.toContain(`🚀`)
+  })
+
+  it(`keeps Obsidian callout syntax working`, () => {
+    const html = render(`:::tip\nBody\n:::`)
+
+    expect(html).toContain(`markdown-alert`)
+    expect(html).toContain(`Body`)
+  })
 })
 
 describe(`slider extension`, () => {

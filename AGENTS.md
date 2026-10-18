@@ -4,7 +4,7 @@
 
 ## 项目概览
 
-**doocs/md** — 一款微信 Markdown 编辑器，将 Markdown 渲染为微信公众号文章格式。支持自定义主题样式、多图床、AI 助手、浏览器扩展、**简体中文 / English 界面**等特性。
+**doocs/md** — 一款微信 Markdown 编辑器，将 Markdown 渲染为微信公众号文章格式。支持自定义主题样式、多图床、AI 助手、浏览器扩展、**zh-CN / zh-TW / en-US / ja-JP 界面**等特性。
 
 - **在线地址:** https://md.doocs.org
 - **Node 版本:** >= 22.22.2（`.nvmrc`: v22.22.2）
@@ -13,17 +13,17 @@
 
 ## Monorepo 结构
 
-| 工作区           | 路径                  | 说明                                                                 |
-| ---------------- | --------------------- | -------------------------------------------------------------------- |
-| `@md/web`        | `apps/web`            | 主应用，Vue 3 + 浏览器扩展（WXT: Chrome/Firefox）                    |
-| `doocs-md`       | `apps/vscode`         | VS Code 扩展（webpack 构建，marketplace ID: `doocs.doocs-md`）       |
-| `@md/utools`     | `apps/utools`         | uTools 插件打包                                                      |
-| `@md/core`       | `packages/core`       | 核心 Markdown 渲染引擎（marked + 自定义扩展）                        |
-| `@md/shared`     | `packages/shared`     | 共享工具函数、配置、类型、编辑器配置                                 |
-| `@md/config`     | `packages/config`     | TypeScript 配置基础文件                                              |
-| `@doocs/md-cli`  | `packages/md-cli`     | CLI 工具（Express 服务托管构建产物）                                 |
-| `@md/mcp-server` | `packages/mcp-server` | MCP 服务，为 AI Agent 暴露接口                                       |
-| `@md/api`        | `apps/api`            | 后端 API：账户登录 + 云同步 + 计费（Cloudflare Workers + Hono + D1） |
+| 工作区           | 路径                  | 说明                                                                                                  |
+| ---------------- | --------------------- | ----------------------------------------------------------------------------------------------------- |
+| `@md/web`        | `apps/web`            | 主应用，Vue 3 + 浏览器扩展（WXT: Chrome/Firefox）                                                     |
+| `doocs-md`       | `apps/vscode`         | VS Code 扩展（webpack 构建，marketplace ID: `doocs.doocs-md`）                                        |
+| `@md/utools`     | `apps/utools`         | uTools 插件打包                                                                                       |
+| `@md/core`       | `packages/core`       | 核心 Markdown 渲染引擎（marked + 自定义扩展）                                                         |
+| `@md/shared`     | `packages/shared`     | 共享工具函数、配置、类型、编辑器配置                                                                  |
+| `@md/config`     | `packages/config`     | TypeScript 配置基础文件                                                                               |
+| `@doocs/md-cli`  | `packages/md-cli`     | CLI 工具（Express 服务托管构建产物）                                                                  |
+| `@md/mcp-server` | `packages/mcp-server` | MCP 服务，为 AI Agent 暴露接口                                                                        |
+| `@md/api`        | `apps/api`            | 后端 API：账户、云同步、计费、上传代理、分享、主题/组件市场、表情包（Cloudflare Workers + Hono + D1） |
 
 独立示例（不在 workspace 内）：`docs/examples/wechat-openapi-worker/` — 微信公众号 OpenAPI 代理 Worker。
 
@@ -40,7 +40,6 @@ pnpm run build:cli    # 构建 web + 复制到 md-cli + npm pack
 pnpm run release:cli  # 通过 scripts/release.js 发布 CLI
 pnpm utools:package   # 打包 uTools 插件
 pnpm run inspector    # node-modules-inspector 查看依赖树
-pnpm link-claude-skills  # 链接 .claude/skills → .agents/skills
 ```
 
 ### Web 应用 (`@md/web`)
@@ -109,7 +108,7 @@ pnpm mcp dev          # MCP Server 监听模式
 Web 主应用与部分浏览器扩展 UI 支持 **zh-CN**、**zh-TW**、**en-US**、**ja-JP**；VS Code 扩展、uTools、CLI、MCP **未**国际化。
 
 - **库**：`vue-i18n`（composition API，`legacy: false`），在 `apps/web/vite.config.ts` 中通过 `unplugin-auto-import` 自动导入 `useI18n`
-- **文案**：`apps/web/src/i18n/messages/{zh-CN,zh-TW,en-US,ja-JP}/`（`common`、`editor`、`dialog`、`store`、`ai`、`upload`、`chrome`）
+- **文案**：`apps/web/src/i18n/messages/{zh-CN,zh-TW,en-US,ja-JP}/`（`common`、`editor`、`dialog`、`store`、`ai`、`upload`、`chrome`、`marketplace`、`notifications`）
 - **组件内**：`useI18n()` + `t('key')`；**Store / 工具函数**：`@/i18n/translate` 的 `t()` / `getLocale()` / `formatLocalDateTime()`
 - **语言状态**：`useLocaleStore`（持久化 key：`locale`）；用户可在 **偏好设置**（`Ctrl+,`）→ General 切换
 - **启动**：`await initStorage()` → `setupI18n(detectInitialLocale())` → Pinia → `useLocaleStore()`（见 `apps/web/src/bootstrap.ts`）；`index.html` 启动屏从 `localStorage` 读取 locale
@@ -133,8 +132,9 @@ Web 主应用与部分浏览器扩展 UI 支持 **zh-CN**、**zh-TW**、**en-US*
 1. **共享版本用 catalog** — 跨包共用的工具链版本集中在 `pnpm-workspace.yaml` 的 `catalog`（`typescript`、`vitest`、`wrangler`、`@types/node`、`marked`、`@codemirror/state|view` 等）；workspace 内各 `package.json` 用 `"catalog:"` 引用。**仓库根 `package.json` 因 `private: false` 可被 npm 消费，须写普通 semver，勿用 `catalog:`。**包专属依赖可继续写版本号（`pnpm/json-enforce-catalog` 已关闭）
 2. **Prettier 必须固定在 `2.8.8`** — 通过 catalog + `overrides.prettier` 强制（根 package 直接写 `2.8.8`）
 3. **Patch 文件：** 如果打了 patch 的依赖升级了，必须同步更新 `patches/` 中对应的 patch 文件：
-   - `@codemirror/view` → `patches/@codemirror__view@6.43.9.patch`（导出 `MeasureRequest` 接口，修复 macOS 上 Alt+Shift 快捷键处理）
-   - `juice` → `patches/juice@12.1.2.patch`（为 `parseCSS` 返回值增加空值检查）
+   - `@codemirror/view` → `patches/@codemirror__view@6.43.14.patch`（导出 `MeasureRequest` 接口，修复 macOS 上 Alt+Shift 快捷键处理）
+   - `mermaid` → `patches/mermaid@12.2.0.patch`（流程图 HTML 标签在非整数 DPR 下按宽度换行，避免文字被裁切）
+   - `juice` 12.2.0 已在上游处理 `parseCSS` 空返回值，不再需要本地 patch
 4. 更新 `pnpm-workspace.yaml` 中的 `patchedDependencies` 以匹配新版本
 5. 运行 `pnpm install` 重新生成 `pnpm-lock.yaml`；可用 `pnpm dedupe` 收敛可合并的间接依赖
 
@@ -148,21 +148,16 @@ Web 主应用与部分浏览器扩展 UI 支持 **zh-CN**、**zh-TW**、**en-US*
 
 ## Git 规范
 
-- **提交信息:** 遵循 Conventional Commits（`feat`、`fix`、`docs`、`style`、`refactor`、`perf`、`test`、`build`、`chore`），**一律使用英文**
-- **分支命名:** `feat/description`、`fix/description`
+- **提交信息 / PR 标题:** 遵循 Conventional Commits（`feat`、`fix`、`docs`、`style`、`refactor`、`perf`、`test`、`build`、`chore`），**一律使用英文**（见 `CONTRIBUTING.md`）
+- **分支命名:** `feat/description`、`fix/description`、`docs/description`；其他类型用 `<type>/`
+- **PR 说明:** 按 [`.github/pull_request_template.md`](./.github/pull_request_template.md) 填写；无关联 Issue 时不要写 Related Issue 占位符
 
 ## Skills
 
-Reusable workflows live in [`.agents/skills/`](./.agents/skills/) (canonical). Claude Code reads the same files via `.claude/skills` → `.agents/skills`.
+Reusable workflows live in [`.agents/skills/`](./.agents/skills/) (canonical). Claude Code discovers each skill through a git symlink:
 
-After clone, create the link once:
-
-```bash
-# macOS / Linux / Git Bash
-./scripts/link-claude-skills.sh
-
-# Windows PowerShell
-./scripts/link-claude-skills.ps1
+```text
+.claude/skills/<name> → ../../.agents/skills/<name>
 ```
 
 | Skill        | When to use                                                                           |

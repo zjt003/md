@@ -103,6 +103,7 @@ export default {
     githubLogin: `Sign in with GitHub`,
     extensionLoginUnavailable: `In-extension sign-in is unavailable. Update the extension or use the web app.`,
     loginFailed: `Sign-in failed. Please try again later.`,
+    loginCancelled: `Sign-in cancelled`,
     loggingIn: `Signing in…`,
     cloudSync: `Cloud Sync`,
     sharePreview: `Share Preview`,
@@ -165,6 +166,7 @@ export default {
       ],
       other: [
         { name: `Emoji`, syntax: `:rocket: :tada: :+1:`, example: `🚀 🎉 👍`, tip: `GitHub shortcodes; names that are not included stay as plain text` },
+        { name: `Sticker`, syntax: `<Emoji id="liulei" />\n<Emoji id="liulei" width="20%" />\n<Emoji id="liulei" width="20%" align="center" />`, tip: `Built-in inline component; align applies only on its own line` },
         { name: `Ruby annotation`, syntax: `[text]{ruby}\n[text]^(ruby)`, example: `hello`, tip: `Supports kana, pinyin, and more` },
         { name: `Slideshow`, syntax: `<![alt](url1),![alt](url2)>`, tip: `Horizontal swipe images, WeChat Official Accounts only` },
         { name: `HTML tags`, syntax: `<center>centered content</center>`, tip: `Some HTML tags are supported` },
@@ -242,8 +244,8 @@ export default {
       hint: `Sync editor and preview scrolling`,
     },
     showAIToolbox: {
-      label: `AI toolbox`,
-      hint: `Show floating AI tools when text is selected`,
+      label: `AI toolbar`,
+      hint: `Show the AI assistant, image generator, and toolbox on the editor edge`,
     },
     imageReupload: {
       label: `Image re-upload`,

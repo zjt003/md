@@ -1,6 +1,7 @@
 import type { ComponentRegistry, CustomComponentDef } from '@md/shared/types'
 import type { MarkedExtension } from 'marked'
 import { escapeHtml, unescapeHtml } from '../utils/basicHelpers'
+import { blockScanLimit, indexOfWithin } from '../utils/scan'
 
 // Built-in components
 
@@ -121,7 +122,30 @@ export const BUILT_IN_COMPONENTS: CustomComponentDef[] = [
 </section>`,
     example: `<BadgeGroup tags='["Vue 3","TypeScript","Vite","Tailwind CSS"]' color="#07c160" />`,
   },
+  {
+    id: `builtin-emoji`,
+    name: `Emoji`,
+    description: `行内表情贴纸，从系统或「我的表情」插入`,
+    builtIn: true,
+    inline: true,
+    hidden: true,
+    template: ``,
+    props: [
+      { name: `id`, description: `表情 ID`, required: true },
+      { name: `alt`, description: `替代文本（可选）` },
+      { name: `width`, description: `宽度百分比，如 20%（可选，默认小尺寸）` },
+      { name: `align`, description: `独占一行时的对齐：left、center、right（可选）` },
+    ],
+    example: `<Emoji id="liulei" alt="流泪" />`,
+  },
 ]
+
+/** Names reserved for system inline components; not parsed as block tags. */
+export const INLINE_SYSTEM_COMPONENT_NAMES = new Set([`Emoji`])
+
+export function isInlineSystemComponent(name: string): boolean {
+  return INLINE_SYSTEM_COMPONENT_NAMES.has(name)
+}
 
 // Prop parsing
 
@@ -374,6 +398,17 @@ export function markedComponent(
     return template.split(`{name}`).join(name)
   }
 
+  function readComponentName(src: string, from: number): string {
+    let i = from
+    while (i < src.length && /\w/.test(src[i]))
+      i++
+    return src.slice(from, i)
+  }
+
+  function isInlineComponentName(name: string): boolean {
+    return isInlineSystemComponent(name) || resolveRegistry()[name]?.inline === true
+  }
+
   function findLineEnd(src: string, from: number): number {
     const newlineIdx = src.indexOf(`\n`, from)
     return newlineIdx >= 0 ? newlineIdx : src.length
@@ -383,29 +418,76 @@ export function markedComponent(
     return src.slice(from, findLineEnd(src, from)).trim() === ``
   }
 
+  /**
+   * Cheap rejection before the line walk below: a component tag always starts
+   * `<` immediately followed by an uppercase letter. marked calls `start()` at
+   * every block boundary with the whole remaining source, and most documents
+   * contain no component at all, so this native scan keeps the common case off
+   * the per-line path entirely.
+   */
+  function hasComponentCandidate(src: string, limit: number): boolean {
+    let from = 0
+    for (;;) {
+      const index = indexOfWithin(src, `<`, from, limit)
+      if (index === -1)
+        return false
+      const next = src.charCodeAt(index + 1)
+      if (next >= 65 && next <= 90)
+        return true
+      from = index + 1
+    }
+  }
+
+  /** Length of a leading ``` / ~~~ fence on the line at `lineStart`, else 0. */
+  function fenceRunLength(src: string, lineStart: number, lineEnd: number): { char: string, length: number } | null {
+    let i = lineStart
+    let indent = 0
+    while (i < lineEnd && src[i] === ` ` && indent < 3) {
+      i++
+      indent++
+    }
+    const char = src[i]
+    if (char !== `\`` && char !== `~`)
+      return null
+    let length = 0
+    while (i + length < lineEnd && src[i + length] === char)
+      length++
+    return length >= 3 ? { char, length } : null
+  }
+
   function findComponentStart(src: string): number | undefined {
-    let offset = 0
+    const limit = blockScanLimit(src)
+    if (!hasComponentCandidate(src, limit))
+      return undefined
+
     let fenceChar = ``
     let fenceLength = 0
+    let lineStart = 0
 
-    for (const line of src.split(`\n`)) {
-      const fenceMatch = line.match(/^ {0,3}([`~]{3,})/)
+    while (lineStart <= limit) {
+      const lineEnd = findLineEnd(src, lineStart)
+      const fence = fenceRunLength(src, lineStart, lineEnd)
 
       if (fenceChar) {
-        if (fenceMatch && fenceMatch[1][0] === fenceChar && fenceMatch[1].length >= fenceLength) {
+        if (fence && fence.char === fenceChar && fence.length >= fenceLength) {
           fenceChar = ``
           fenceLength = 0
         }
       }
-      else if (fenceMatch) {
-        fenceChar = fenceMatch[1][0]
-        fenceLength = fenceMatch[1].length
+      else if (fence) {
+        fenceChar = fence.char
+        fenceLength = fence.length
       }
-      else if (line[0] === `<` && line[1] >= `A` && line[1] <= `Z`) {
-        return offset
+      else {
+        const next = src.charCodeAt(lineStart + 1)
+        if (src[lineStart] === `<` && next >= 65 && next <= 90) {
+          const name = readComponentName(src, lineStart + 1)
+          if (!isInlineComponentName(name))
+            return lineStart
+        }
       }
 
-      offset += line.length + 1
+      lineStart = lineEnd + 1
     }
 
     return undefined
@@ -454,11 +536,10 @@ export function markedComponent(
     if (src[0] !== `<` || src[1] < `A` || src[1] > `Z`)
       return null
 
-    let i = 1
-    while (i < src.length && /\w/.test(src[i])) i++
-    const name = src.slice(1, i)
-    if (!name)
+    const name = readComponentName(src, 1)
+    if (!name || isInlineComponentName(name))
       return null
+    const i = 1 + name.length
 
     // Scan open tag; respect > inside quoted attribute values
     let inQuote = ``

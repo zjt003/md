@@ -7,6 +7,8 @@ description: Create a GitHub pull request following project conventions. Use whe
 
 This skill guides you through creating a well-structured GitHub pull request that follows project conventions and best practices.
 
+Do **not** assume Bash. On Windows PowerShell, avoid `&&`, `$(...)`, and POSIX tests; run git/`gh` commands as separate invocations and use `$env:TEMP` for the PR body file.
+
 ## Prerequisites Check
 
 Before proceeding, verify the following:
@@ -53,23 +55,33 @@ Ensure you're not on `main` or `master`. If so, ask the user to create or switch
 
 ### 2. Find the base branch
 
-Determine the default branch once and reuse it as `BASE_BRANCH` in all later commands:
+Resolve the default branch once and reuse it as `BASE_BRANCH`. Do **not** assume Bash (`$(...)`, `sed`, `[ -z ... ]` fail in PowerShell).
 
 ```bash
-BASE_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
-
-# Fallback when origin/HEAD is not configured
-if [ -z "$BASE_BRANCH" ]; then
-  BASE_BRANCH=$(git remote show origin | sed -n '/HEAD branch/s/.*: //p')
-fi
+git symbolic-ref refs/remotes/origin/HEAD
 ```
+
+This prints `refs/remotes/origin/<branch>` (usually `main`). Use the last path segment.
+
+```powershell
+# PowerShell
+$BASE_BRANCH = (git symbolic-ref refs/remotes/origin/HEAD).Split('/')[-1]
+```
+
+If that fails, run `git remote show origin` and parse the `HEAD branch:` line.
 
 This is typically `main` or `master`, but may differ per repo.
 
 ### 3. Analyze recent commits relevant to this PR
 
 ```bash
+# Bash / zsh
 git log "origin/${BASE_BRANCH}..HEAD" --oneline --no-decorate
+```
+
+```powershell
+# PowerShell
+git log "origin/$BASE_BRANCH..HEAD" --oneline --no-decorate
 ```
 
 Review these commits to understand:
@@ -80,7 +92,13 @@ Review these commits to understand:
 ### 4. Review the diff
 
 ```bash
+# Bash / zsh
 git diff "origin/${BASE_BRANCH}..HEAD" --stat
+```
+
+```powershell
+# PowerShell
+git diff "origin/$BASE_BRANCH..HEAD" --stat
 ```
 
 This shows which files changed and helps identify the type of change.
@@ -120,12 +138,9 @@ Before creating the PR, consider these best practices:
    git fetch origin
    git rebase "origin/${BASE_BRANCH}"
    ```
+   In PowerShell, use `"origin/$BASE_BRANCH"`.
 
-2. **Squash if appropriate**: If there are many small "WIP" commits, consider interactive rebase:
-   ```bash
-   git rebase -i "origin/${BASE_BRANCH}"
-   ```
-   Only suggest this if commits appear messy and the user is comfortable with rebasing.
+2. **Squash if appropriate**: If history is messy, ask the user whether they want commits squashed. Do **not** run `git rebase -i` (interactive; agents cannot complete it).
 
 ### Push Changes
 
@@ -141,37 +156,40 @@ git push origin HEAD --force-with-lease
 
 ## Create the Pull Request
 
-Use `CONTRIBUTING.md` (Pull Request 流程) as the source of truth for PR content. If `.github/pull_request_template.md` exists, follow that template exactly. Otherwise, use this structure:
+Use `CONTRIBUTING.md` (Pull Request 流程) as the source of truth for PR content. Follow [`.github/pull_request_template.md`](../../../.github/pull_request_template.md) exactly:
 
 - **Summary** — what changed and why
-- **Related Issue** — only when a real issue is linked (e.g. `Closes #123`); omit entirely if none
 - **Type of Change** — check applicable boxes
 - **Test Procedure** — how you verified the change
 - **Pre-flight Checklist** — mark items that apply
 
 When filling out the PR body:
-- Include **Related Issue** only when a real issue number is known (e.g. `Closes #123`). **Do not** add a Related Issue section or `#XXXX` placeholder when there is no linked issue.
-- Fill in all other sections with relevant information gathered from commits and context
+- Fill in all template sections with relevant information gathered from commits and context
 - Mark the appropriate "Type of Change" checkbox(es)
 - Complete the "Pre-flight Checklist" items that apply
+- **Related Issue is not in the template.** Add a `## Related Issue` section with `Closes #123` only when this PR actually fixes an issue. Never add `#XXXX` or an empty Related Issue heading.
 
 ### Create PR with gh CLI
 
 **Use a temporary file for the PR body** to avoid shell escaping issues, newline problems, and other command-line flakiness:
 
-1. Write the PR body to a temporary file (e.g. `$env:TEMP/pr-body.md` on Windows, `/tmp/pr-body.md` on macOS/Linux).
+1. Write the PR body to a temporary file (`$env:TEMP/pr-body.md` on Windows PowerShell, `/tmp/pr-body.md` on macOS/Linux).
 
 2. Create the PR using the file:
+
    ```bash
+   # Bash / zsh
    gh pr create --title "PR_TITLE" --body-file /tmp/pr-body.md --base "$BASE_BRANCH"
+   ```
+
+   ```powershell
+   # PowerShell
+   gh pr create --title "PR_TITLE" --body-file "$env:TEMP/pr-body.md" --base $BASE_BRANCH
    ```
 
 3. Clean up the temporary file after the PR is created.
 
-For draft PRs:
-```bash
-gh pr create --title "PR_TITLE" --body-file /tmp/pr-body.md --base "$BASE_BRANCH" --draft
-```
+For draft PRs, add `--draft` to the same command.
 
 **Why use a file?** Passing complex markdown with newlines, special characters, and checkboxes directly via `--body` is error-prone. The `--body-file` flag handles all content reliably.
 
@@ -209,7 +227,7 @@ Before finalizing, ensure:
 - [ ] Working directory is clean
 - [ ] All commits are pushed
 - [ ] Branch is up-to-date with base branch
-- [ ] Related Issue section included only when a real issue is linked (no `#XXXX` placeholder)
+- [ ] Related Issue included only when a real issue is linked (no empty heading, no `#XXXX` placeholder)
 - [ ] PR description follows the template or project conventions
 - [ ] Appropriate type of change is selected
 - [ ] Pre-flight checklist items are addressed
